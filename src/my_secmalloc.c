@@ -11,10 +11,12 @@ void *my_malloc(size_t size)
     (void)size;
     return NULL;
 }
+
 void my_free(void *ptr)
 {
     (void)ptr;
 }
+
 void *my_calloc(size_t nmemb, size_t size)
 {
     (void)nmemb;
