@@ -10,15 +10,6 @@ This project allows to work with :
 > **Note**
 > It is not optimized for performances but for security.
 
-## Roadmap
-
-With security in mind,
-
-- [ ] Rewrite `free`.
-- [ ] Rewrite `malloc`.
-- [ ] Rewrite `calloc`.
-- [ ] Rewrite `realloc`.
-
 We are constrained to use syscalls `mmap`, `munmap` and `mremap`. We also have to use ANSSI's [best practise development guide](https://cyber.gouv.fr/publications/regles-de-programmation-pour-le-developpement-securise-de-logiciels-en-langage-c).
 
 As this is a library, we also have to make it compliant with static and dynamic linking.
