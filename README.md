@@ -43,6 +43,29 @@ $ LD_PRELOAD=libmy_secmalloc.so <command>
 
 ## Algorithm
 
+1. We have a **data pool** gotten from a `mmap` call containing all data and canaries.
+2. The **data pool** is accessible through a global variable (which its symbol is private).
+3. We have a new **metadata pool** from a second `mmap` that contains a list of **data pool** descriptors.
+4. For each allocated memory block, our descriptor should at least contain :
+   1. A pointer to the **data pool**
+   2. The state of the allocated block (busy/free)
+   3. Its size
+5. The **metadata pool** is also accesible through a global variable (which its symbol is also private).
+
+A call to `malloc` will :
+1. search for a descriptor in the **metadata pool** to a free block that have a big enough free space.
+2. in the worst case scenario, it should create a descriptor and add it the the **metadata pool**
+3. if this doesn't fit in either pool, it should resize it with `mremap`
+
+A call to `free` will verify that :
+1. the provided pointer is in our **metadata pool**
+2. its descriptor points to a busy block
+3. the canary at the end of the block has not been tampered (or it will provoke a stop of the process)
+
+And it will also mark the block as free, and optionally merge two free consecutive ones.
+
+![Secmalloc implementation](assets/secmalloc.png)
+
 ## Features
 
 ### Logging
