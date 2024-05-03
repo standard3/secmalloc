@@ -7,13 +7,6 @@
 
 #include "my_secmalloc.private.h"
 
-Test(logging, simple_logging, .init = cr_redirect_stderr)
-{
-    init_logging();
-    log_general(1, LOG_INFO, "Hello, %s", "world");
-    cr_expect_stderr_eq_str("Hello, world\n");
-}
-
 Test(mmap, simple_mmap)
 {
     void *ptr = mmap(

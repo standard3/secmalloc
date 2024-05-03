@@ -10,6 +10,11 @@
 
 int log_fd = -1; // Default log file descriptor
 
+/** Usage example
+ * init_logging();
+ * log_general(log_fd, LOG_INFO, "Hello, %s", "world");
+ */
+
 /**
  * Get the current time
  *
