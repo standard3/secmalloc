@@ -10,17 +10,18 @@ typedef enum
     USED
 } chunk_state_t;
 
-typedef struct chunk_t
+typedef struct
 {
-    size_t size;
-    chunk_state_t state;
-    chunk_t *next;
+    void *address;       // Address of the chunk
+    chunk_state_t state; // State of the chunk
+    size_t size;         // Size of the chunk
+    size_t available;    // Available memory in the chunk
 } chunk_t;
 
 typedef struct
 {
-    chunk_t *start;
-    size_t available;
+    chunk_t *chunk; // Actual chunk data pointer
+    chunk_t *next;  // Next chunk in the list
 } chunk_list_t;
 
 void *my_malloc(size_t size);
