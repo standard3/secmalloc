@@ -1,7 +1,7 @@
 CC = gcc
-CFLAGS = -I./include -Wall -Wextra -Werror 
+CFLAGS = -I./include -Wall -Wextra -Werror -Wformat=2
 PRJ = my_secmalloc
-OBJS = src/my_secmalloc.o
+OBJS = src/my_secmalloc.o src/utils.o
 SLIB = lib${PRJ}.a
 LIB = lib${PRJ}.so
 
