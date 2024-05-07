@@ -88,3 +88,6 @@ dkms.conf
 
 # Test files
 test/test
+
+# Exemples files
+examples
