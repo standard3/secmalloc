@@ -24,6 +24,13 @@ typedef struct
     chunk_t *next;  // Next chunk in the list
 } chunk_list_t;
 
+// Allocation internals functions
+chunk_t *init_heap(void);
+chunk_t *find_free_chunk(size_t s);
+chunk_t *find_last_chunk(size_t s);
+int remap_heap(size_t s);
+chunk_t *get_free_chunk(size_t s);
+
 void *my_malloc(size_t size);
 void my_free(void *ptr);
 void *my_calloc(size_t nmemb, size_t size);

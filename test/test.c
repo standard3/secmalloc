@@ -21,3 +21,16 @@ Test(mmap, simple_mmap)
     int res = munmap(ptr, 4096);
     cr_expect(res == 0);
 }
+
+Test(mmap, init_heap)
+{
+    chunk_t *heap = init_heap();
+    cr_expect(heap != NULL);
+    cr_expect(heap->address == heap);
+    cr_expect(heap->state == FREE);
+    cr_expect(heap->size == 4096 - sizeof(chunk_t));
+    cr_expect(heap->available == heap->size);
+
+    int res = munmap(heap, 4096);
+    cr_expect(res == 0);
+}

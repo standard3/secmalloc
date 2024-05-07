@@ -6,6 +6,39 @@
 #include <sys/mman.h>
 #include <string.h>
 
+#define PAGE_SIZE 4096
+
+// Global variables, serves as "static"
+chunk_t *heap = NULL;
+const size_t heap_size = PAGE_SIZE;
+
+/**
+ * @brief Initializes the heap for secure memory allocation.
+ *
+ * This function initializes the heap by allocating a chunk of memory using mmap.
+ * It sets the initial state, size, and availability of the heap.
+ *
+ * @return A pointer to the initialized heap.
+ */
+chunk_t *init_heap()
+{
+    if (heap == NULL)
+    {
+        heap = (chunk_t *)mmap(
+            NULL,
+            heap_size,
+            PROT_READ | PROT_WRITE,
+            MAP_PRIVATE | MAP_ANON,
+            -1,
+            0);
+        heap->address = heap;
+        heap->state = FREE;
+        heap->size = heap_size - sizeof(chunk_t);
+        heap->available = heap->size;
+    }
+    return heap;
+}
+
 void *my_malloc(size_t size)
 {
     (void)size;
