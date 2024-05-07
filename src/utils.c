@@ -16,12 +16,11 @@ int log_fd = -1; // Default log file descriptor
  */
 
 /**
- * Get the current time
+ * @brief Get the current time
  *
  * @return pointer to the current time
  */
-struct tm *
-get_current_time()
+struct tm *get_current_time()
 {
     time_t raw_time;
     struct tm *timeinfo;
@@ -32,7 +31,7 @@ get_current_time()
 }
 
 /**
- * Generic logging function that puts the log message in
+ * @brief Generic logging function that puts the log message in
  * the specified file descriptor
  *
  * @param fd file descriptor identifier
@@ -81,7 +80,7 @@ void log_general(const int fd, const char *log_name, const char *format, ...)
 }
 
 /**
- * Create a log file with the specified path
+ * @brief Create a log file with the specified path
  * If the file already exists, it will be overwritten.
  * The file descriptor is returned.
  * If the file cannot be created, -1 is returned.
@@ -99,7 +98,7 @@ int create_log_file(const char *path)
 }
 
 /**
- * Initialize the log file.
+ * @brief Initialize the log file.
  * Handles the presence of the MSM_OUTPUT environment variable
  * and creates the log file accordingly.
  *
@@ -122,7 +121,7 @@ void init_logging()
 }
 
 /**
- * Close the log file.
+ * @brief Close the log file.
  *
  */
 void close_logging()
