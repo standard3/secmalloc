@@ -105,12 +105,24 @@ int create_log_file(const char *path)
  */
 void init_logging()
 {
+    // Get the path from the environment variable
     const char *path = getenv("MSM_OUTPUT");
     if (path == NULL)
     {
         log_fd = DEACTIVATE_LOGGING;
         return;
     }
+
+    // If stdout, set the file descriptor to stdout
+    if (strcmp(path, "stdout") == 0)
+    {
+        log_fd = STDOUT_FILENO;
+        return;
+    }
+
+    // If already opened, return
+    if (log_fd != -1)
+        return;
 
     log_fd = create_log_file(path);
     if (log_fd == -1)
