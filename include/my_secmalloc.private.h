@@ -4,20 +4,34 @@
 #include "my_secmalloc.h"
 #include "utils.h"
 
+/** @brief Represents the state of a memory chunk. */
 typedef enum
 {
     FREE,
     USED
 } chunk_state_t;
 
+/**
+ * @struct chunk_t
+ * @brief Represents a memory chunk in the secure memory allocator.
+ *
+ * This struct contains information about a memory chunk, including its address,
+ * state, size, and available memory.
+ */
 typedef struct
 {
     void *address;       // Address of the chunk
     chunk_state_t state; // State of the chunk
     size_t size;         // Size of the chunk
-    size_t available;    // Available memory in the chunk
 } chunk_t;
 
+/**
+ * @struct chunk_list_t
+ * @brief Represents a node in the chunk list.
+ *
+ * This struct is used to store information about a chunk in the chunk list.
+ * It contains a pointer to the actual chunk data and a pointer to the next chunk in the list.
+ */
 typedef struct
 {
     chunk_t *chunk; // Actual chunk data pointer
@@ -25,7 +39,8 @@ typedef struct
 } chunk_list_t;
 
 // Allocation internals functions
-chunk_t *init_heap(void);
+chunk_list_t *init_heap(void);
+chunk_t *allocate_chunk(size_t size);
 chunk_t *find_free_chunk(size_t s);
 chunk_t *find_last_chunk(size_t s);
 int remap_heap(size_t s);

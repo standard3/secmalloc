@@ -8,9 +8,9 @@
 
 #define PAGE_SIZE 4096
 
-// Global variables, serves as "static"
-chunk_t *heap = NULL;
+chunk_list_t *heap = NULL;
 const size_t heap_size = PAGE_SIZE;
+const size_t heap_offset_size = 1e5; // 100 000 pages
 
 /**
  * @brief Initializes the heap for secure memory allocation.
@@ -20,23 +20,56 @@ const size_t heap_size = PAGE_SIZE;
  *
  * @return A pointer to the initialized heap.
  */
-chunk_t *init_heap()
+chunk_list_t *init_heap()
 {
-    if (heap == NULL)
-    {
-        heap = (chunk_t *)mmap(
-            NULL,
-            heap_size,
-            PROT_READ | PROT_WRITE,
-            MAP_PRIVATE | MAP_ANON,
-            -1,
-            0);
-        heap->address = heap;
-        heap->state = FREE;
-        heap->size = heap_size - sizeof(chunk_t);
-        heap->available = heap->size;
-    }
+    if (heap != NULL)
+        return heap;
+
+    // Allocate memory for the heap
+    heap = (chunk_list_t *)mmap(
+        NULL,
+        heap_size * heap_offset_size, // allows to map into the 100000th page
+        PROT_READ | PROT_WRITE,
+        MAP_PRIVATE | MAP_ANON,
+        -1,
+        0);
+
+    heap->chunk = NULL;
+    heap->next = NULL;
+
     return heap;
+}
+
+/**
+ * Allocates a chunk of memory with the specified size.
+ *
+ * @param size The size of the chunk to allocate.
+ * @return A pointer to the allocated chunk, or NULL if allocation fails.
+ */
+chunk_t *allocate_chunk(size_t size)
+{
+    chunk_t *chunk = (chunk_t *)mmap(
+        NULL,
+        size,
+        PROT_READ | PROT_WRITE,
+        MAP_PRIVATE | MAP_ANON,
+        -1,
+        0);
+
+    if (chunk == MAP_FAILED)
+        return NULL;
+
+    chunk->address = (void *)(chunk);
+    chunk->state = FREE;
+    chunk->size = size;
+
+    return chunk;
+}
+
+chunk_t *find_free_chunk(size_t size)
+{
+    (void)size;
+    return NULL;
 }
 
 void *my_malloc(size_t size)
