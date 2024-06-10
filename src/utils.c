@@ -141,5 +141,7 @@ void close_logging()
     if (log_fd == DEACTIVATE_LOGGING)
         return;
 
+    log_general(log_fd, LOG_INFO, "Closing log file");
+
     close(log_fd);
 }
