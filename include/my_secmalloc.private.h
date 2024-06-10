@@ -39,7 +39,7 @@ typedef struct chunk_list_t
 } chunk_list_t;
 
 // Heap initialization
-chunk_list_t *init_metadata_pool(void);
+chunk_list_t *init_pool(void *addr, size_t size);
 chunk_list_t *init_heap(void);
 
 // Chunks

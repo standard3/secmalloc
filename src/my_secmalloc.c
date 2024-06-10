@@ -1,4 +1,5 @@
 #define _GNU_SOURCE
+
 #include "my_secmalloc.private.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -12,31 +13,40 @@
 extern int log_fd; // Defined in utils.c, used for logging
 
 chunk_list_t *cl_metadata = NULL;
+void *cl_data = NULL;
+
 const size_t heap_size = PAGE_SIZE;
 const size_t metadata_offset = 1e5; // 100 000 pages
 const size_t metadata_size = heap_size * metadata_offset;
 
 /**
- * @brief Initializes the metadata pool for secure memory allocation.
+ * @brief Initializes a memory pool for secure memory allocation.
  *
- * Initializes the metadata pool by allocating a chunk of memory using mmap.
- * The metadata pool is used to store metadata about the allocated chunks, including their address,
- * state, and size.
+ * Initializes the pool by allocating a chunk of memory using mmap.
+ * The pool is used to store either metadata or data about the allocated chunks.
  *
- * @return A pointer to the initialized metadata pool.
+ * @param addr The address of the pool.
+ * @param size The size of the pool.
+ *
+ * @return A pointer to the initialized pool.
  */
-chunk_list_t *init_metadata_pool()
+chunk_list_t *init_pool(void *addr, size_t size)
 {
     chunk_list_t *metadata_pool = (chunk_list_t *)mmap(
-        NULL,
-        metadata_size,
+        addr,
+        size,
         PROT_READ | PROT_WRITE,
         MAP_PRIVATE | MAP_ANON,
         -1,
         0);
 
     if (metadata_pool == MAP_FAILED)
+    {
+        log_general(log_fd, LOG_ERROR, "init_pool - Failed to allocate pool of size %zu", size);
         return NULL;
+    }
+
+    log_general(log_fd, LOG_INFO, "init_pool - Pool initialized at address %p", metadata_pool);
 
     return metadata_pool;
 }
@@ -56,6 +66,7 @@ chunk_list_t *init_heap()
     // Init logging, file descriptor will be closed at exit
     init_logging();
     atexit(close_logging);
+    // TODO: call atexit with a clean function that will free all the allocated memory
 
     if (cl_metadata != NULL)
         return cl_metadata;
@@ -63,21 +74,20 @@ chunk_list_t *init_heap()
     log_general(log_fd, LOG_INFO, "init_heap - Initializing pools of memory");
 
     // Allocate metadata heap
-    cl_metadata = init_metadata_pool();
+    cl_metadata = init_pool(NULL, metadata_size);
     if (cl_metadata == NULL)
     {
         log_general(log_fd, LOG_ERROR, "init_heap - Failed to allocate metadata pool");
         return NULL;
     }
 
-    // TODO: should be allocated only when needed
-    // chunk_t *chunk = init_data_chunk(cl_metadata);
-    // if (chunk == MAP_FAILED)
-    // {
-    //     log_general(log_fd, LOG_ERROR, "init_heap - Failed to allocate data pool");
-    //     return NULL;
-    // }
-    // log_general(log_fd, LOG_INFO, "init_heap - New chunk initialized at address %p", chunk);
+    // Allocate one page for the data pool at the end of the metadata pool
+    cl_data = init_pool(cl_metadata + metadata_size, heap_size);
+    if (cl_data == NULL)
+    {
+        log_general(log_fd, LOG_ERROR, "init_heap - Failed to allocate data pool");
+        return NULL;
+    }
 
     return cl_metadata;
 }
@@ -90,8 +100,6 @@ chunk_list_t *init_heap()
  */
 chunk_t *allocate_chunk(size_t size)
 {
-    log_general(log_fd, LOG_INFO, "allocate_chunk - Allocating chunk of size %zu", size);
-
     chunk_t *chunk = (chunk_t *)mmap(
         NULL,
         size,
@@ -107,7 +115,7 @@ chunk_t *allocate_chunk(size_t size)
     chunk->state = FREE;
     chunk->size = size;
 
-    log_general(log_fd, LOG_INFO, "allocate_chunk - Chunk allocated at address %p", chunk);
+    log_general(log_fd, LOG_INFO, "allocate_chunk - Chunk of size %zu allocated at address %p", size, chunk);
 
     return chunk;
 }
@@ -139,12 +147,13 @@ void my_free(void *ptr)
 
     log_general(log_fd, LOG_INFO, "my_free - Freeing chunk at address %p", ptr);
 
+    // Set chunk state to free
     chunk_t *chunk = (chunk_t *)((chunk_t *)ptr);
     chunk->state = FREE;
 
-    log_general(log_fd, LOG_INFO, "my_free - Chunk at address %p freed", ptr);
+    // TODO: merge contiguous free chunks
 
-    // TODO: Merge contiguous free chunks
+    log_general(log_fd, LOG_INFO, "my_free - Chunk at address %p freed", ptr);
 }
 
 void *my_calloc(size_t nmemb, size_t size)
