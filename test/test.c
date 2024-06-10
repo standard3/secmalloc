@@ -106,24 +106,58 @@ Test(allocation, allocate_and_free)
     close_logging();
 }
 
-// Test(allocation, allocate_multiple_chunks_and_free)
-// {
-//     init_logging();
-//     chunk_t *chunk1 = allocate_chunk(3);
-//     cr_expect_not_null(chunk1);
-//     cr_expect_eq(chunk1->size, 3);
+Test(allocation, allocate_multiple_chunks_and_free)
+{
+    init_logging();
+    chunk_t *chunk1 = allocate_chunk(3);
+    cr_expect_not_null(chunk1);
+    cr_expect_eq(chunk1->size, 3);
 
-//     chunk_t *chunk2 = allocate_chunk(5);
-//     cr_expect_not_null(chunk2);
-//     cr_expect_eq(chunk2->size, 5);
+    chunk_t *chunk2 = allocate_chunk(5);
+    cr_expect_not_null(chunk2);
+    cr_expect_eq(chunk2->size, 5);
 
-//     chunk_t *chunk3 = allocate_chunk(8);
-//     cr_expect_not_null(chunk3);
-//     cr_expect_eq(chunk3->size, 8);
+    chunk_t *chunk3 = allocate_chunk(8);
+    cr_expect_not_null(chunk3);
+    cr_expect_eq(chunk3->size, 8);
 
-//     my_free(chunk1);
-//     my_free(chunk2);
-//     my_free(chunk3);
+    my_free(chunk1);
+    my_free(chunk2);
+    my_free(chunk3);
 
-//     close_logging();
-// }
+    close_logging();
+}
+
+Test(allocation, init_heap_and_append)
+{
+    chunk_list_t *heap = init_heap();
+    cr_expect_not_null(heap);
+    cr_expect_null(heap->chunk);
+    cr_expect_null(heap->next);
+
+    chunk_t *chunk1 = allocate_chunk(3);
+    cr_expect_not_null(chunk1);
+    cr_expect_eq(chunk1->size, 3);
+
+    chunk_t *chunk2 = allocate_chunk(5);
+    cr_expect_not_null(chunk2);
+    cr_expect_eq(chunk2->size, 5);
+
+    chunk_t *chunk3 = allocate_chunk(8);
+    cr_expect_not_null(chunk3);
+    cr_expect_eq(chunk3->size, 8);
+
+    heap->chunk = chunk1;
+    heap->next = malloc(sizeof(chunk_list_t));
+    cr_expect_not_null(heap->next);
+
+    heap->next->chunk = chunk2;
+    heap->next->next = malloc(sizeof(chunk_list_t));
+    cr_expect_not_null(heap->next->next);
+
+    heap->next->next->chunk = chunk3;
+    heap->next->next->next = NULL;
+
+    int res = munmap(heap, heap_size * metadata_offset);
+    cr_expect(res == 0);
+}
