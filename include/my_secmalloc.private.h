@@ -32,10 +32,10 @@ typedef struct
  * This struct is used to store information about a chunk in the chunk list.
  * It contains a pointer to the actual chunk data and a pointer to the next chunk in the list.
  */
-typedef struct
+typedef struct chunk_list_t
 {
-    chunk_t *chunk; // Actual chunk data pointer
-    chunk_t *next;  // Next chunk in the list
+    chunk_t *chunk;            // Actual chunk data pointer
+    struct chunk_list_t *next; // Next element in the list
 } chunk_list_t;
 
 // Heap initialization
