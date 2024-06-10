@@ -7,8 +7,12 @@
 
 #include "my_secmalloc.private.h"
 
+extern chunk_list_t *cl_metadata;
+extern void *cl_data;
+
 extern const size_t heap_size;
 extern const size_t metadata_offset;
+extern const size_t metadata_size;
 
 Test(mmap, simple_mmap)
 {
@@ -31,6 +35,9 @@ Test(allocation, init_heap)
     cr_expect_not_null(heap);
     cr_expect_null(heap->chunk);
     cr_expect_null(heap->next);
+
+    // check if address of the data pool is well over the metadata pool
+    cr_expect_geq((size_t)cl_data, (size_t)cl_metadata + metadata_size);
 
     int res = munmap(heap, heap_size * metadata_offset);
     cr_expect(res == 0);
@@ -94,7 +101,6 @@ Test(allocation, allocate_multiple_chunks)
 
 Test(allocation, allocate_and_free)
 {
-    init_logging();
     chunk_t *chunk = allocate_chunk(3);
     cr_expect_not_null(chunk);
     cr_expect_eq(chunk->size, 3);
@@ -102,13 +108,10 @@ Test(allocation, allocate_and_free)
     my_free(chunk);
 
     cr_expect_eq(chunk->state, FREE);
-
-    close_logging();
 }
 
 Test(allocation, allocate_multiple_chunks_and_free)
 {
-    init_logging();
     chunk_t *chunk1 = allocate_chunk(3);
     cr_expect_not_null(chunk1);
     cr_expect_eq(chunk1->size, 3);
@@ -124,17 +127,17 @@ Test(allocation, allocate_multiple_chunks_and_free)
     my_free(chunk1);
     my_free(chunk2);
     my_free(chunk3);
-
-    close_logging();
 }
 
 Test(allocation, init_heap_and_append)
 {
+    // Initialize the heap
     chunk_list_t *heap = init_heap();
     cr_expect_not_null(heap);
     cr_expect_null(heap->chunk);
     cr_expect_null(heap->next);
 
+    // Allocate chunks
     chunk_t *chunk1 = allocate_chunk(3);
     cr_expect_not_null(chunk1);
     cr_expect_eq(chunk1->size, 3);
@@ -147,6 +150,7 @@ Test(allocation, init_heap_and_append)
     cr_expect_not_null(chunk3);
     cr_expect_eq(chunk3->size, 8);
 
+    // Append the chunks to the heap
     heap->chunk = chunk1;
     heap->next = malloc(sizeof(chunk_list_t));
     cr_expect_not_null(heap->next);
@@ -157,7 +161,15 @@ Test(allocation, init_heap_and_append)
 
     heap->next->next->chunk = chunk3;
     heap->next->next->next = NULL;
+    cr_expect_null(heap->next->next->next);
 
-    int res = munmap(heap, heap_size * metadata_offset);
-    cr_expect(res == 0);
+    // Free the heap
+    my_free(chunk1);
+    my_free(chunk2);
+    my_free(chunk3);
+
+    // Check that the heap is empty
+    // cr_expect_null(heap->chunk);
+    // cr_expect_null(heap->next->chunk);
+    // cr_expect_null(heap->next->next->chunk);
 }
