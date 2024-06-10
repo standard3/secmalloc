@@ -99,7 +99,7 @@ Test(allocation, allocate_multiple_chunks)
     cr_expect(res3 == 0);
 }
 
-Test(allocation, allocate_and_free)
+Test(allocation, free)
 {
     chunk_t *chunk = allocate_chunk(3);
     cr_expect_not_null(chunk);
@@ -110,7 +110,7 @@ Test(allocation, allocate_and_free)
     cr_expect_eq(chunk->state, FREE);
 }
 
-Test(allocation, allocate_multiple_chunks_and_free)
+Test(allocation, multiple_free)
 {
     chunk_t *chunk1 = allocate_chunk(3);
     cr_expect_not_null(chunk1);
