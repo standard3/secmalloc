@@ -139,7 +139,7 @@ void my_free(void *ptr)
 
     log_general(log_fd, LOG_INFO, "my_free - Freeing chunk at address %p", ptr);
 
-    chunk_t *chunk = (chunk_t *)((chunk_t *)ptr - sizeof(chunk_t));
+    chunk_t *chunk = (chunk_t *)((chunk_t *)ptr);
     chunk->state = FREE;
 
     log_general(log_fd, LOG_INFO, "my_free - Chunk at address %p freed", ptr);
