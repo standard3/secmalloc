@@ -2,6 +2,7 @@
     "files.associations": {
         "my_secmalloc.private.h": "c",
         "utils.h": "c",
-        "my_secmalloc.h": "c"
+        "my_secmalloc.h": "c",
+        "\\": "c"
     }
 }
