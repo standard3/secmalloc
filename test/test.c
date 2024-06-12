@@ -111,6 +111,7 @@ Test(chunk_list, find_free_chunk)
 {
     init_heap();
 
+    // Create chunks
     chunk_t *chunk1 = allocate_chunk(3);
     cr_expect_not_null(chunk1);
     cr_expect_eq(chunk1->size, 3);
@@ -123,10 +124,45 @@ Test(chunk_list, find_free_chunk)
     cr_expect_not_null(chunk3);
     cr_expect_eq(chunk3->size, 8);
 
-    chunk_t *free_chunk = find_free_chunk(5);
-    cr_expect_not_null(free_chunk);
-    cr_expect_eq(free_chunk->size, 5);
+    // Create chunks list element
+    chunk_list_t *first = (chunk_list_t *)mmap(
+        NULL,
+        sizeof(chunk_list_t),
+        PROT_READ | PROT_WRITE,
+        MAP_PRIVATE | MAP_ANON,
+        -1,
+        0);
+    cr_expect_not_null(first);
+    first->chunk = chunk1;
 
+    chunk_list_t *second = first + sizeof(chunk_list_t);
+    cr_expect_not_null(second);
+    second->chunk = chunk2;
+
+    chunk_list_t *third = second + sizeof(chunk_list_t);
+    cr_expect_not_null(third);
+    third->chunk = chunk3;
+
+    // Set the chunks list
+    cl_metadata = first;
+    first->next = second;
+    second->next = third;
+    third->next = NULL;
+
+    // Set two first chunks to be used
+    cl_metadata->chunk->state = USED;
+    cl_metadata->next->chunk->state = USED;
+
+    // Find a free chunk, should be the last one
+    chunk_t *free_chunk = find_free_chunk(8);
+    cr_expect_not_null(free_chunk);
+    cr_expect_eq(free_chunk->size, 8);
+
+    // Try to find a free chunk that does not exist
+    chunk_t *impossible_chunk = find_free_chunk(40);
+    cr_expect_null(impossible_chunk);
+
+    // Free the chunks
     int res1 = munmap(chunk1, 3);
     cr_expect(res1 == 0);
 
@@ -135,6 +171,9 @@ Test(chunk_list, find_free_chunk)
 
     int res3 = munmap(chunk3, 8);
     cr_expect(res3 == 0);
+
+    int res4 = munmap(first, sizeof(chunk_list_t));
+    cr_expect(res4 == 0);
 }
 
 // Test(freeing, simple_free_error, .init = setup)

@@ -133,9 +133,10 @@ chunk_t *find_free_chunk(size_t size)
             log_general(log_fd, LOG_INFO, "find_free_chunk - Found free chunk of size %zu at address %p", size, current->chunk);
             return current->chunk;
         }
-
         current = current->next;
     }
+
+    log_general(log_fd, LOG_WARNING, "find_free_chunk - No free chunk of size %zu found", size);
 
     return NULL;
 }
