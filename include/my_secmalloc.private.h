@@ -48,6 +48,7 @@ chunk_t *find_free_chunk(size_t s);
 chunk_t *find_last_chunk(size_t s);
 int remap_heap(size_t s);
 chunk_t *get_free_chunk(size_t s);
+void free_chunk(chunk_list_t *current);
 
 // Secure memory allocation
 void *my_malloc(size_t size);
