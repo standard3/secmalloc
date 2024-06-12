@@ -93,7 +93,7 @@ chunk_list_t *init_heap()
 }
 
 /**
- * Allocates a chunk of memory with the specified size.
+ * @brief Allocates a chunk of memory with the specified size.
  *
  * @param size The size of the chunk to allocate.
  * @return A pointer to the allocated chunk, or NULL if allocation fails.
@@ -122,16 +122,32 @@ chunk_t *allocate_chunk(size_t size)
 
 chunk_t *find_free_chunk(size_t size)
 {
-    (void)size;
-    // chunk_list_t *current = heap;
-    // while (current != NULL)
-    // {
-    //     if (current->chunk->state == FREE && current->chunk->size >= size)
-    //         return current->chunk;
-    //     current = current->next;
-    // }
+    if (cl_metadata == NULL)
+        cl_metadata = init_heap();
+
+    chunk_list_t *current = cl_metadata;
+    while (current != NULL)
+    {
+        if (current->chunk->state == FREE && current->chunk->size >= size)
+        {
+            log_general(log_fd, LOG_INFO, "find_free_chunk - Found free chunk of size %zu at address %p", size, current->chunk);
+            return current->chunk;
+        }
+
+        current = current->next;
+    }
 
     return NULL;
+}
+
+/**
+ * @brief Set the state of a chunk to FREE.
+ *
+ * @param current The chunk to free.
+ */
+void free_chunk(chunk_list_t *current)
+{
+    current->chunk->state = FREE;
 }
 
 void *my_malloc(size_t size)
@@ -140,18 +156,70 @@ void *my_malloc(size_t size)
     return NULL;
 }
 
+/**
+ * @brief Frees a previously allocated chunk of memory.
+ *
+ * Frees the chunk by setting its state to FREE and merging it with adjacent free chunks.
+ *
+ * @param ptr A pointer to the chunk to free.
+ */
 void my_free(void *ptr)
 {
     if (ptr == NULL)
         return;
 
-    log_general(log_fd, LOG_INFO, "my_free - Freeing chunk at address %p", ptr);
-
-    // Set chunk state to free
+    // Check if the chunk is already free
     chunk_t *chunk = (chunk_t *)((chunk_t *)ptr);
-    chunk->state = FREE;
+    if (chunk->state == FREE)
+    {
+        log_general(log_fd, LOG_INFO, "my_free - Chunk at address %p is already free", ptr);
+        return;
+    }
 
-    // TODO: merge contiguous free chunks
+    // Check if metadata list is initialized
+    if (cl_metadata == NULL)
+    {
+        log_general(log_fd, LOG_ERROR, "my_free - Metadata list is NULL");
+        return;
+    }
+
+    // Find the chunk in the metadata list
+    chunk_list_t *current = cl_metadata;
+    do
+    {
+        log_general(log_fd, LOG_INFO, "my_free - current chunk address: %p", current->chunk);
+
+        // Set chunk state to free
+        if (current->chunk == chunk)
+        {
+            log_general(log_fd, LOG_INFO, "my_free - went here 2");
+            free_chunk(current);
+            break;
+        }
+
+        log_general(log_fd, LOG_INFO, "my_free - went here 3");
+        current = current->next;
+    } while (current->chunk != chunk);
+
+    log_general(log_fd, LOG_INFO, "my_free - Freed chunk at address %p", chunk);
+
+    // Merge free chunks
+    // FIXME: this will not work for non-consecutive metadata "chunks"
+    // as elements in the metadata list are not necessarily contiguous
+    while (current->chunk->state == FREE)
+    {
+        // TODO: write a warning if the chunk is not in the metadata list
+
+        chunk_list_t *next = current->next;
+        if (next != NULL && next->chunk->state == FREE)
+        {
+            current->chunk->size += next->chunk->size;
+            current->next = next->next;
+
+            log_general(log_fd, LOG_INFO, "my_free - Merged chunk at address %p with chunk at address %p, size was %zu", current->chunk, next->chunk, current->chunk->size);
+        }
+        current = current->next;
+    }
 
     log_general(log_fd, LOG_INFO, "my_free - Chunk at address %p freed", ptr);
 }
