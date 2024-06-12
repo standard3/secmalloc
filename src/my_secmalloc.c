@@ -120,6 +120,12 @@ chunk_t *allocate_chunk(size_t size)
     return chunk;
 }
 
+/**
+ * @brief Finds the first free chunk containg at least @size in the metadata list.
+ *
+ * @param size The size of the chunk to find.
+ * @return A pointer to the last chunk in the metadata list or NULL if no free chunk is found.
+ */
 chunk_t *find_free_chunk(size_t size)
 {
     if (cl_metadata == NULL)
