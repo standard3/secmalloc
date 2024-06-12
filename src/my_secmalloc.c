@@ -42,11 +42,11 @@ chunk_list_t *init_pool(void *addr, size_t size)
 
     if (metadata_pool == MAP_FAILED)
     {
-        log_general(log_fd, LOG_ERROR, "init_pool - Failed to allocate pool of size %zu", size);
+        LOG_ERROR("init_pool - Failed to allocate pool of size %zu", size);
         return NULL;
     }
 
-    log_general(log_fd, LOG_INFO, "init_pool - Pool initialized at address %p", metadata_pool);
+    LOG_INFO("init_pool - Pool initialized at address %p", metadata_pool);
 
     return metadata_pool;
 }
@@ -71,13 +71,13 @@ chunk_list_t *init_heap()
     if (cl_metadata != NULL)
         return cl_metadata;
 
-    log_general(log_fd, LOG_INFO, "init_heap - Initializing pools of memory");
+    LOG_INFO("init_heap - Initializing pools of memory");
 
     // Allocate metadata heap
     cl_metadata = init_pool(NULL, metadata_size);
     if (cl_metadata == NULL)
     {
-        log_general(log_fd, LOG_ERROR, "init_heap - Failed to allocate metadata pool");
+        LOG_ERROR("init_heap - Failed to allocate metadata pool");
         return NULL;
     }
 
@@ -85,7 +85,7 @@ chunk_list_t *init_heap()
     cl_data = init_pool(cl_metadata + metadata_size, heap_size);
     if (cl_data == NULL)
     {
-        log_general(log_fd, LOG_ERROR, "init_heap - Failed to allocate data pool");
+        LOG_ERROR("init_heap - Failed to allocate data pool");
         return NULL;
     }
 
@@ -115,7 +115,7 @@ chunk_t *allocate_chunk(size_t size)
     chunk->state = FREE;
     chunk->size = size;
 
-    log_general(log_fd, LOG_INFO, "allocate_chunk - Chunk of size %zu allocated at address %p", size, chunk);
+    LOG_INFO("allocate_chunk - Chunk of size %zu allocated at address %p", size, chunk);
 
     return chunk;
 }
@@ -128,22 +128,35 @@ chunk_t *allocate_chunk(size_t size)
  */
 chunk_t *find_free_chunk(size_t size)
 {
-    if (cl_metadata == NULL)
-        cl_metadata = init_heap();
-
     chunk_list_t *current = cl_metadata;
     while (current != NULL)
     {
         if (current->chunk->state == FREE && current->chunk->size >= size)
         {
-            log_general(log_fd, LOG_INFO, "find_free_chunk - Found free chunk of size %zu at address %p", size, current->chunk);
+            LOG_INFO("find_free_chunk - Found free chunk of size %zu at address %p", size, current->chunk);
             return current->chunk;
         }
         current = current->next;
     }
 
-    log_general(log_fd, LOG_WARNING, "find_free_chunk - No free chunk of size %zu found", size);
+    LOG_WARN("find_free_chunk - No free chunk of size %zu found", size);
 
+    return NULL;
+}
+
+chunk_t *get_free_chunk(size_t s)
+{
+    if (cl_metadata == NULL)
+        cl_metadata = init_heap();
+
+    chunk_t *chunk = find_free_chunk(s);
+    if (chunk == NULL)
+    {
+        LOG_WARN("get_free_chunk - No free chunk of size %zu found, remapping", s);
+
+        // remap and create a new chunk
+    }
+    (void)s;
     return NULL;
 }
 
@@ -179,14 +192,14 @@ void my_free(void *ptr)
     chunk_t *chunk = (chunk_t *)((chunk_t *)ptr);
     if (chunk->state == FREE)
     {
-        log_general(log_fd, LOG_INFO, "my_free - Chunk at address %p is already free", ptr);
+        LOG_INFO("my_free - Chunk at address %p is already free", ptr);
         return;
     }
 
     // Check if metadata list is initialized
     if (cl_metadata == NULL)
     {
-        log_general(log_fd, LOG_ERROR, "my_free - Metadata list is NULL");
+        LOG_ERROR("my_free - Metadata list is NULL");
         return;
     }
 
@@ -194,21 +207,21 @@ void my_free(void *ptr)
     chunk_list_t *current = cl_metadata;
     do
     {
-        log_general(log_fd, LOG_INFO, "my_free - current chunk address: %p", current->chunk);
+        LOG_INFO("my_free - current chunk address: %p", current->chunk);
 
         // Set chunk state to free
         if (current->chunk == chunk)
         {
-            log_general(log_fd, LOG_INFO, "my_free - went here 2");
+            LOG_INFO("my_free - went here 2");
             free_chunk(current);
             break;
         }
 
-        log_general(log_fd, LOG_INFO, "my_free - went here 3");
+        LOG_INFO("my_free - went here 3");
         current = current->next;
     } while (current->chunk != chunk);
 
-    log_general(log_fd, LOG_INFO, "my_free - Freed chunk at address %p", chunk);
+    LOG_INFO("my_free - Freed chunk at address %p", chunk);
 
     // Merge free chunks
     // FIXME: this will not work for non-consecutive metadata "chunks"
@@ -223,12 +236,12 @@ void my_free(void *ptr)
             current->chunk->size += next->chunk->size;
             current->next = next->next;
 
-            log_general(log_fd, LOG_INFO, "my_free - Merged chunk at address %p with chunk at address %p, size was %zu", current->chunk, next->chunk, current->chunk->size);
+            LOG_INFO("my_free - Merged chunk at address %p with chunk at address %p, size was %zu", current->chunk, next->chunk, current->chunk->size);
         }
         current = current->next;
     }
 
-    log_general(log_fd, LOG_INFO, "my_free - Chunk at address %p freed", ptr);
+    LOG_INFO("my_free - Chunk at address %p freed", ptr);
 }
 
 void *my_calloc(size_t nmemb, size_t size)
