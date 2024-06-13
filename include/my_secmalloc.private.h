@@ -2,7 +2,6 @@
 #define _SECMALLOC_PRIVATE_H
 
 #include "my_secmalloc.h"
-#include <stdbool.h>
 
 /** @brief Represents the state of a memory chunk. */
 typedef enum

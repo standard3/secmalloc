@@ -1,13 +1,10 @@
 #define _GNU_SOURCE
+#include <sys/mman.h> // mmap, munmap
+#include <stdarg.h>   // va_list, va_start, va_end
+#include <string.h>   // memset, memcpy
+#include <stdlib.h>   // atexit
+
 #include "my_secmalloc.private.h"
-#include <stdio.h>
-#include <alloca.h>
-#include <unistd.h>
-#include <sys/mman.h>
-#include <stdarg.h>
-#include <stdbool.h>
-#include <string.h>
-#include <stdlib.h>
 #include "utils.h"
 
 #define PAGE_SIZE 4096
