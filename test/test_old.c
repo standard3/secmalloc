@@ -7,6 +7,21 @@
 
 #include "my_secmalloc.private.h"
 
+extern int log_fd;
+
+extern chunk_list_t *cl_metadata;
+extern void *cl_data;
+
+extern const size_t heap_size;
+extern const size_t metadata_offset;
+extern const size_t metadata_size;
+
+void setup(void)
+{
+    init_logging();
+    cr_log_info("Setting up...");
+}
+
 Test(mmap, simple_mmap)
 {
     void *ptr = mmap(
@@ -21,3 +36,245 @@ Test(mmap, simple_mmap)
     int res = munmap(ptr, 4096);
     cr_expect(res == 0);
 }
+
+Test(allocation, init_heap)
+{
+    chunk_list_t *heap = init_heap();
+    cr_expect_not_null(heap);
+    cr_expect_null(heap->chunk);
+    cr_expect_null(heap->next);
+
+    // check if address of the data pool is well over the metadata pool
+    cr_expect_geq((size_t)cl_data, (size_t)cl_metadata + metadata_size);
+
+    int res = munmap(heap, heap_size * metadata_offset);
+    cr_expect(res == 0);
+}
+
+Test(allocation, allocate_small_chunk)
+{
+    chunk_t *chunk = allocate_chunk(3);
+    cr_expect_not_null(chunk);
+    cr_expect_eq(chunk->size, 3);
+
+    int res = munmap(chunk, 3);
+    cr_expect(res == 0);
+}
+
+Test(allocation, allocate_big_chunk)
+{
+    chunk_t *chunk = allocate_chunk(heap_size);
+    cr_expect_not_null(chunk);
+    cr_expect_eq(chunk->size, heap_size);
+
+    int res = munmap(chunk, heap_size);
+    cr_expect(res == 0);
+}
+
+Test(allocation, allocate_huge_chunk)
+{
+    const size_t chunk_size = heap_size * 400;
+
+    chunk_t *chunk = allocate_chunk(chunk_size);
+    cr_expect_not_null(chunk);
+    cr_expect_eq(chunk->size, chunk_size);
+
+    int res = munmap(chunk, chunk_size);
+    cr_expect(res == 0);
+}
+
+Test(allocation, allocate_multiple_chunks)
+{
+    chunk_t *chunk1 = allocate_chunk(3);
+    cr_expect_not_null(chunk1);
+    cr_expect_eq(chunk1->size, 3);
+
+    chunk_t *chunk2 = allocate_chunk(5);
+    cr_expect_not_null(chunk2);
+    cr_expect_eq(chunk2->size, 5);
+
+    chunk_t *chunk3 = allocate_chunk(8);
+    cr_expect_not_null(chunk3);
+    cr_expect_eq(chunk3->size, 8);
+
+    int res1 = munmap(chunk1, 3);
+    cr_expect(res1 == 0);
+
+    int res2 = munmap(chunk2, 5);
+    cr_expect(res2 == 0);
+
+    int res3 = munmap(chunk3, 8);
+    cr_expect(res3 == 0);
+}
+
+Test(chunk_list, find_free_chunk)
+{
+    init_heap();
+
+    // Create chunks
+    chunk_t *chunk1 = allocate_chunk(3);
+    cr_expect_not_null(chunk1);
+    cr_expect_eq(chunk1->size, 3);
+
+    chunk_t *chunk2 = allocate_chunk(5);
+    cr_expect_not_null(chunk2);
+    cr_expect_eq(chunk2->size, 5);
+
+    chunk_t *chunk3 = allocate_chunk(8);
+    cr_expect_not_null(chunk3);
+    cr_expect_eq(chunk3->size, 8);
+
+    // Create chunks list element
+    chunk_list_t *first = (chunk_list_t *)mmap(
+        NULL,
+        sizeof(chunk_list_t),
+        PROT_READ | PROT_WRITE,
+        MAP_PRIVATE | MAP_ANON,
+        -1,
+        0);
+    cr_expect_not_null(first);
+    first->chunk = chunk1;
+
+    chunk_list_t *second = first + sizeof(chunk_list_t);
+    cr_expect_not_null(second);
+    second->chunk = chunk2;
+
+    chunk_list_t *third = second + sizeof(chunk_list_t);
+    cr_expect_not_null(third);
+    third->chunk = chunk3;
+
+    // Set the chunks list
+    cl_metadata = first;
+    first->next = second;
+    second->next = third;
+    third->next = NULL;
+
+    // Set two first chunks to be used
+    cl_metadata->chunk->state = USED;
+    cl_metadata->next->chunk->state = USED;
+
+    // Find a free chunk, should be the last one
+    chunk_t *free_chunk = find_free_chunk(8);
+    cr_expect_not_null(free_chunk);
+    cr_expect_eq(free_chunk->size, 8);
+
+    // Try to find a free chunk that does not exist
+    chunk_t *impossible_chunk = find_free_chunk(40);
+    cr_expect_null(impossible_chunk);
+
+    // Free the chunks
+    int res1 = munmap(chunk1, 3);
+    cr_expect(res1 == 0);
+
+    int res2 = munmap(chunk2, 5);
+    cr_expect(res2 == 0);
+
+    int res3 = munmap(chunk3, 8);
+    cr_expect(res3 == 0);
+
+    int res4 = munmap(first, sizeof(chunk_list_t));
+    cr_expect(res4 == 0);
+}
+
+// Test(freeing, simple_free_error, .init = setup)
+// {
+//     chunk_t *chunk = allocate_chunk(3);
+//     cr_expect_not_null(chunk, "Chunk is NULL");
+//     cr_expect_eq(chunk->size, 3, "Chunk size is not 3");
+
+//     my_free(chunk);
+
+//     cr_expect_eq(chunk->state, FREE, "Chunk state is not FREE");
+// }
+
+// Test(freeing, simple_free, .init = setup)
+// {
+//     init_heap();
+
+//     chunk_t *chunk = allocate_chunk(3);
+//     cr_expect_not_null(chunk, "Chunk is NULL");
+//     cr_expect_eq(chunk->size, 3, "Chunk size is not 3");
+
+//     chunk->state = USED;
+
+//     my_free(chunk);
+
+//     cr_expect_eq(chunk->state, FREE, "Chunk state is not FREE");
+
+//     int res = munmap(chunk, 3);
+//     cr_expect(res == 0);
+// }
+
+// Test(freeing, multiple_free)
+// {
+//     init_heap();
+
+//     chunk_t *chunk1 = allocate_chunk(3);
+//     cr_expect_not_null(chunk1);
+//     cr_expect_eq(chunk1->size, 3);
+
+//     chunk_t *chunk2 = allocate_chunk(5);
+//     cr_expect_not_null(chunk2);
+//     cr_expect_eq(chunk2->size, 5);
+
+//     chunk_t *chunk3 = allocate_chunk(8);
+//     cr_expect_not_null(chunk3);
+//     cr_expect_eq(chunk3->size, 8);
+
+//     chunk1->state = USED;
+//     chunk2->state = USED;
+//     chunk3->state = USED;
+
+//     my_free(chunk1);
+//     my_free(chunk2);
+//     my_free(chunk3);
+
+//     cr_expect_eq(chunk1->state, FREE);
+//     cr_expect_eq(chunk2->state, FREE);
+//     cr_expect_eq(chunk3->state, FREE);
+// }
+
+// Test(allocation, init_heap_and_append)
+// {
+//     // Initialize the heap
+//     chunk_list_t *heap = init_heap();
+//     cr_expect_not_null(heap);
+//     cr_expect_null(heap->chunk);
+//     cr_expect_null(heap->next);
+
+//     // Allocate chunks
+//     chunk_t *chunk1 = allocate_chunk(3);
+//     cr_expect_not_null(chunk1);
+//     cr_expect_eq(chunk1->size, 3);
+
+//     chunk_t *chunk2 = allocate_chunk(5);
+//     cr_expect_not_null(chunk2);
+//     cr_expect_eq(chunk2->size, 5);
+
+//     chunk_t *chunk3 = allocate_chunk(8);
+//     cr_expect_not_null(chunk3);
+//     cr_expect_eq(chunk3->size, 8);
+
+//     // Append the chunks to the heap
+//     heap->chunk = chunk1;
+//     heap->next = malloc(sizeof(chunk_list_t));
+//     cr_expect_not_null(heap->next);
+
+//     heap->next->chunk = chunk2;
+//     heap->next->next = malloc(sizeof(chunk_list_t));
+//     cr_expect_not_null(heap->next->next);
+
+//     heap->next->next->chunk = chunk3;
+//     heap->next->next->next = NULL;
+//     cr_expect_null(heap->next->next->next);
+
+//     // Free the heap
+//     my_free(chunk1);
+//     my_free(chunk2);
+//     my_free(chunk3);
+
+//     // Check that the heap is empty
+//     // cr_expect_null(heap->chunk);
+//     // cr_expect_null(heap->next->chunk);
+//     // cr_expect_null(heap->next->next->chunk);
+// }
