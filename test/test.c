@@ -1,28 +1,40 @@
+#include <string.h>   // strcpy, strncpy
+#include <sys/mman.h> // mmap, munmap
+#include <time.h>     // time
+
 #include <criterion/criterion.h>
-#include <stdio.h>
-#include <string.h>
+
 #include "my_secmalloc.private.h"
 #include "my_secmalloc.h"
-#include <sys/mman.h>
-#include <time.h>
 
-// Simple mmap test
-Test(mmap, simple)
+void setup(void)
 {
+    // init_logging();
+    cr_log_info("Setting up...");
+}
 
-    void *ptr = mmap(NULL, 4096, PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
+Test(mmap, simple_mmap)
+{
+    void *ptr = mmap(
+        NULL,
+        4096,
+        PROT_READ | PROT_WRITE,
+        MAP_ANONYMOUS | MAP_PRIVATE,
+        -1,
+        0);
     cr_expect(ptr != NULL);
+
     int res = munmap(ptr, 4096);
     cr_expect(res == 0);
 }
 
-// Basic allocation and deallocation tests
 Test(my_malloc, basic_allocation)
 {
 
     void *ptr = my_malloc(4096);
     cr_expect(ptr != NULL);
     my_free(ptr);
+    cr_expect(ptr == NULL);
 }
 
 Test(my_malloc, allocation_and_write)
