@@ -5,6 +5,7 @@
 #include <unistd.h>
 #include <alloca.h>
 #include <string.h>
+#include <fcntl.h>
 
 #include "utils.h"
 
@@ -45,17 +46,20 @@ void log_general(const int fd, const char *log_name, const char *format, ...)
     if (log_fd == DEACTIVATE_LOGGING)
         return;
 
-    const struct tm *timeinfo = get_current_time();
+    // Deactivated time logging because of mystery infinite loop, will fix later
+    // const struct tm *timeinfo = get_current_time();
     const pid_t pid = getpid();
 
-    char time_buffer[20];
-    char prefix[34];
+    // char time_buffer[20] = {0};
+    // char prefix[34] = {0};
+    char prefix[15] = {0};
 
     // Buffer for our time string
-    strftime(time_buffer, sizeof(time_buffer), "%Y-%m-%d %H:%M:%S", timeinfo);
+    // strftime(time_buffer, sizeof(time_buffer), "%Y-%m-%d %H:%M:%S", timeinfo);
 
     // Buffer for our header
-    snprintf(prefix, sizeof(prefix), "%s %d [%s] ", time_buffer, pid, log_name);
+    // snprintf(prefix, sizeof(prefix), "%s %d [%s] ", time_buffer, pid, log_name);
+    snprintf(prefix, sizeof(prefix), "%d [%s] ", pid, log_name);
 
     // Calculate the required size for the log message
     va_list args_copy;
@@ -90,11 +94,11 @@ void log_general(const int fd, const char *log_name, const char *format, ...)
  */
 int create_log_file(const char *path)
 {
-    FILE *log_file = fopen(path, "w");
-    if (log_file == NULL)
+    int fd = open(path, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+    if (fd == -1)
         return -1;
 
-    return log_file->_fileno;
+    return fd;
 }
 
 /**
