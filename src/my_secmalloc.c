@@ -44,8 +44,6 @@ void *init_pool(void *addr, size_t size)
         return NULL;
     }
 
-    LOG_INFO("init_pool - Pool initialized at address %p", pool);
-
     return pool;
 }
 
@@ -69,6 +67,7 @@ chunk_list_t *init_heap()
     init_logging();
     atexit(close_logging);
     atexit(check_memory_leaks);
+    atexit(clean);
 
     LOG_INFO("init_heap - Initializing pools of memory");
 
@@ -413,6 +412,32 @@ void check_memory_leaks()
         }
         current = current->next;
     }
+}
+
+/**
+ * @brief Cleans up the memory pool.
+ */
+void clean()
+{
+    // Get total size of the data pool
+    size_t data_size = 0;
+    chunk_list_t *current = cl_metadata_head;
+    while (current != NULL)
+    {
+        data_size += current->size;
+        current = current->next;
+    }
+
+    // Free the data pool
+    munmap(cl_metadata_head, data_size);
+
+    // Free the metadata pool
+    munmap(cl_metadata_head, metadata_offset * sizeof(chunk_list_t));
+
+    // Reset the global variables
+    cl_metadata_head = NULL;
+    cl_metadata_tail = NULL;
+    metadata_size = 0;
 }
 
 #ifdef DYNAMIC

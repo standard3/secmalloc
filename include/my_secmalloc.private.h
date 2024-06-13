@@ -36,6 +36,7 @@ void *allocate_chunk(size_t size);
 void *split_chunk(chunk_list_t *chunk, size_t size);
 void *get_free_chunk(size_t size);
 chunk_list_t *find_free_chunk(size_t size);
+void clean(void);
 
 // Security features
 void check_memory_leaks(void);
