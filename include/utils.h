@@ -2,6 +2,7 @@
 #define _UTILS_H
 
 #include <stdarg.h>
+#include <stdint.h>
 
 #define LOG_TYPE_INFO "INFO"
 #define LOG_TYPE_WARN "WARN"
@@ -20,5 +21,7 @@ void log_general(const int fd, const char *log_name, const char *format, ...);
 int create_log_file(const char *filename);
 void init_logging(void);
 void close_logging(void);
+
+uint32_t get_random_canary();
 
 #endif

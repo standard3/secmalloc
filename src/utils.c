@@ -150,3 +150,29 @@ void close_logging()
 
     close(log_fd);
 }
+
+/**
+ * @brief Get a random 4 bytes canary value
+ *
+ * @return random canary value
+ */
+uint32_t get_random_canary()
+{
+    // Open /dev/urandom
+    uint32_t fd = open("/dev/urandom", O_RDONLY);
+    if (fd == -1)
+        return 0;
+
+    // Read 4 bytes from /dev/urandom
+    uint32_t random = 0;
+    if (lseek(fd, -4, SEEK_END) == -1)
+        return 0;
+
+    // Put the random value in the canary
+    if (read(fd, &random, sizeof(random)) == -1)
+        return 0;
+
+    close(fd);
+
+    return random;
+}
