@@ -14,7 +14,7 @@ ${LIB} : ${OBJS}
 ${SLIB}: ${OBJS}
 
 dynamic: CFLAGS += -DDYNAMIC
-dynamic: ${LIB}
+dynamic: distclean ${LIB}
 
 static: ${SLIB}
 
