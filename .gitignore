@@ -91,3 +91,7 @@ test/test
 
 # Examples files
 examples
+
+# Coverage files
+*.gcda
+*.gcno
