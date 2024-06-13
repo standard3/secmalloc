@@ -272,6 +272,15 @@ void my_free(void *ptr)
         LOG_WARN("my_free - chunk not found");
         return;
     }
+
+    // Check double free
+    if (chunk->state == FREE)
+    {
+        LOG_WARN("my_free - double free");
+        return;
+    }
+
+    // Free the chunk
     if (chunk->state == USED)
         chunk->state = FREE;
 
