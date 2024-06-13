@@ -144,6 +144,7 @@ chunk_t *find_free_chunk(size_t size)
     return NULL;
 }
 
+// WIP
 chunk_t *get_free_chunk(size_t s)
 {
     if (cl_metadata == NULL)
@@ -154,7 +155,7 @@ chunk_t *get_free_chunk(size_t s)
     {
         LOG_WARN("get_free_chunk - No free chunk of size %zu found, remapping", s);
 
-        // remap and create a new chunk
+        // TODO: remap and create a new chunk
     }
     (void)s;
     return NULL;
@@ -222,6 +223,8 @@ void my_free(void *ptr)
     } while (current->chunk != chunk);
 
     LOG_INFO("my_free - Freed chunk at address %p", chunk);
+
+    // TODO: check canary integrity
 
     // Merge free chunks
     // FIXME: this will not work for non-consecutive metadata "chunks"
