@@ -6,15 +6,20 @@
 
 #include "my_secmalloc.private.h"
 #include "my_secmalloc.h"
+#include "utils.h"
 
 void setup(void)
 {
-    // init_logging();
+    init_logging();
     cr_log_info("Setting up...");
 }
 
+/* MMAP */
+
 Test(mmap, simple_mmap)
 {
+    init_logging();
+
     void *ptr = mmap(
         NULL,
         4096,
@@ -28,16 +33,24 @@ Test(mmap, simple_mmap)
     cr_expect(res == 0);
 }
 
-Test(my_malloc, basic_allocation)
-{
+/* INITIALIZATION */
 
+Test(initialization, initialize)
+{
+    void *ptr = init_heap();
+    cr_expect(ptr != NULL);
+}
+
+/* ALLOCATION */
+
+Test(allocation, basic_allocation)
+{
     void *ptr = my_malloc(4096);
     cr_expect(ptr != NULL);
     my_free(ptr);
-    cr_expect(ptr == NULL);
 }
 
-Test(my_malloc, allocation_and_write)
+Test(allocation, allocation_and_write)
 {
 
     void *ptr = my_malloc(4096);
@@ -47,7 +60,7 @@ Test(my_malloc, allocation_and_write)
     my_free(ptr);
 }
 
-Test(my_malloc, multiple_allocations)
+Test(allocation, multiple_allocations)
 {
 
     void *ptr1 = my_malloc(1000);
@@ -64,72 +77,54 @@ Test(my_malloc, multiple_allocations)
     my_free(ptr4);
 }
 
-Test(my_malloc, fragmentation)
+Test(allocation, fragmentation)
 {
-
+    // Allocate multiple blocks
     void *ptr1 = my_malloc(1000);
     void *ptr2 = my_malloc(4096);
     void *ptr3 = my_malloc(1000);
+
     cr_expect(ptr1 != NULL);
     cr_expect(ptr2 != NULL);
     cr_expect(ptr3 != NULL);
+
+    // Write strings in those
     strncpy(ptr1, "Hello", 6);
     strncpy(ptr2, "World", 6);
     strncpy(ptr3, "!", 2);
+
     cr_expect(strcmp(ptr1, "Hello") == 0);
     cr_expect(strcmp(ptr2, "World") == 0);
     cr_expect(strcmp(ptr3, "!") == 0);
+
     my_free(ptr1);
     my_free(ptr2);
     my_free(ptr3);
 }
 
-Test(my_malloc, reallocate_memory)
+Test(allocation, reallocate_memory)
 {
-
     void *ptr = my_malloc(100);
     void *new_ptr = my_realloc(ptr, 200);
+
     cr_expect(new_ptr != NULL);
+
     my_free(new_ptr);
 }
 
-Test(my_calloc, allocate_and_zero_memory)
+Test(allocation, calloc)
 {
-
     void *ptr = my_calloc(10, 20);
     cr_expect(ptr != NULL);
+
     for (size_t i = 0; i < 10 * 20; i++)
-    {
         cr_expect(((char *)ptr)[i] == 0);
-    }
+
     my_free(ptr);
 }
 
-// Metadata tests
-Test(init_heap, initialize)
-{
-
-    void *ptr = init_heap();
-    cr_expect(ptr != NULL);
-}
-
-// Empty block search test
-Test(find_free_chunk, find_block)
-{
-
-    init_heap();
-    void *ptr1 = my_malloc(100);
-    void *ptr2 = my_malloc(200);
-    my_free(ptr1);
-    chunk_list_t *empty_block = find_free_chunk(100);
-    cr_expect(empty_block != NULL);
-    cr_expect(empty_block->state == FREE);
-    cr_expect(empty_block->size >= 100);
-    my_free(ptr2);
-}
-
 // Stress tests
-Test(my_malloc, random_allocations)
+Test(allocation, random_allocations)
 {
     srand(time(NULL));
     int num_allocs = rand() % 100 + 1;
@@ -147,7 +142,7 @@ Test(my_malloc, random_allocations)
     free(ptrs);
 }
 
-Test(my_malloc, random_allocations_with_frees)
+Test(allocation, random_allocations_with_frees)
 {
     srand(time(NULL));
     int num_allocs = rand() % 100 + 1;
@@ -181,49 +176,71 @@ Test(my_malloc, random_allocations_with_frees)
     free(freed);
 }
 
-// Security-focused tests
-Test(my_malloc, buffer_overflow_detection)
-{
+/* SECURITY FEATURES */
 
+Test(security, buffer_overflow_detection)
+{
     void *ptr = my_malloc(100);
     cr_expect(ptr != NULL);
+
     char *data = (char *)ptr;
     for (int i = 0; i < 150; i++)
-    {
         data[i] = 'A'; // Write past the allocated memory
-    }
+
     // Ideally, here we should have a way to detect the overflow
     my_free(ptr);
 }
 
-Test(my_malloc, double_free_detection)
+Test(security, double_free_detection)
 {
-
     void *ptr = my_malloc(100);
     cr_expect(ptr != NULL);
+
     my_free(ptr);
+
     // Double free
     my_free(ptr);
+
     // Ideally, here we should have a way to detect the double free
 }
 
-Test(my_malloc, use_after_free_detection)
+Test(security, use_after_free_detection)
 {
-
     void *ptr = my_malloc(100);
     cr_expect(ptr != NULL);
+
     my_free(ptr);
+
     char *data = (char *)ptr;
     strcpy(data, "Use after free");
+
     // Ideally, here we should have a way to detect the use after free
 }
 
-Test(my_malloc, memory_leak_detection)
+Test(security, memory_leak_detection)
 {
-
     void *ptr = my_malloc(100);
     cr_expect(ptr != NULL);
-    // mygetlist();
+
     // Memory leak
-    // Ideally, here we should have a way to detect the memory leak
+}
+
+/* CHUNK LIST */
+
+Test(chunk_list, find_free_block)
+{
+    init_heap();
+
+    void *ptr1 = my_malloc(100);
+    void *ptr2 = my_malloc(200);
+
+    my_free(ptr1);
+
+    chunk_list_t *empty_block = find_free_chunk(100);
+
+    cr_expect(empty_block != NULL);
+    cr_expect(empty_block->state == FREE);
+    cr_expect(empty_block->size >= 100);
+
+    my_free(ptr2);
 }
