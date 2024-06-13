@@ -22,6 +22,6 @@ int create_log_file(const char *filename);
 void init_logging(void);
 void close_logging(void);
 
-uint32_t get_random_canary();
+uint32_t get_random_canary(void);
 
 #endif

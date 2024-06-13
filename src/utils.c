@@ -160,7 +160,7 @@ uint32_t get_random_canary()
 {
     // Open /dev/urandom
     uint32_t fd = open("/dev/urandom", O_RDONLY);
-    if (fd == -1)
+    if (fd == (uint32_t)-1)
         return 0;
 
     // Read 4 bytes from /dev/urandom
