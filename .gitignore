@@ -42,7 +42,6 @@
 *.su
 *.idb
 *.pdb
-test
 
 # Kernel Module Compile Results
 *.mod*
@@ -87,3 +86,12 @@ dkms.conf
 *.out
 *.app
 
+# Test files
+test/test
+
+# Examples files
+examples
+
+# Coverage files
+*.gcda
+*.gcno

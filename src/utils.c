@@ -5,6 +5,7 @@
 #include <unistd.h>
 #include <alloca.h>
 #include <string.h>
+#include <fcntl.h>
 
 #include "utils.h"
 
@@ -16,12 +17,11 @@ int log_fd = -1; // Default log file descriptor
  */
 
 /**
- * Get the current time
+ * @brief Get the current time
  *
  * @return pointer to the current time
  */
-struct tm *
-get_current_time()
+struct tm *get_current_time()
 {
     time_t raw_time;
     struct tm *timeinfo;
@@ -32,7 +32,7 @@ get_current_time()
 }
 
 /**
- * Generic logging function that puts the log message in
+ * @brief Generic logging function that puts the log message in
  * the specified file descriptor
  *
  * @param fd file descriptor identifier
@@ -46,34 +46,37 @@ void log_general(const int fd, const char *log_name, const char *format, ...)
     if (log_fd == DEACTIVATE_LOGGING)
         return;
 
-    const struct tm *timeinfo = get_current_time();
+    // Deactivated time logging because of mystery infinite loop, will fix later
+    // const struct tm *timeinfo = get_current_time();
     const pid_t pid = getpid();
 
-    char time_buffer[20];
-    char prefix[34];
+    // char time_buffer[20] = {0};
+    // char prefix[34] = {0};
+    char prefix[15] = {0};
 
     // Buffer for our time string
-    strftime(time_buffer, sizeof(time_buffer), "%Y-%m-%d %H:%M:%S", timeinfo);
+    // strftime(time_buffer, sizeof(time_buffer), "%Y-%m-%d %H:%M:%S", timeinfo);
 
     // Buffer for our header
-    snprintf(prefix, sizeof(prefix), "%s %d [%s] ", time_buffer, pid, log_name);
+    // snprintf(prefix, sizeof(prefix), "%s %d [%s] ", time_buffer, pid, log_name);
+    snprintf(prefix, sizeof(prefix), "%d [%s] ", pid, log_name);
 
     // Calculate the required size for the log message
     va_list args_copy;
     va_start(args_copy, format);
-    int len = vsnprintf(NULL, 0, format, args_copy);
+    int len = vsnprintf(NULL, 0, format, args_copy) + 1; // +1 for null terminator
     va_end(args_copy);
 
     // Allocate memory for the log message
-    char *buffer = alloca(len + 1); // +1 for null terminator and +1 for newline
+    char *buffer = alloca(len);
 
     // Format the log message with header
     va_start(args_copy, format);
-    vsnprintf(buffer, len + 1, format, args_copy); // -1 to leave space for the null terminator
+    vsnprintf(buffer, len, format, args_copy); // -1 to leave space for the null terminator
     va_end(args_copy);
 
     // Concatenate log prefix and message
-    char log_message[len + sizeof(prefix) + 1]; // +1 for null terminator
+    char log_message[len + sizeof(prefix)];
     snprintf(log_message, sizeof(log_message), "%s%s\n", prefix, buffer);
 
     // Write to file descriptor
@@ -81,7 +84,7 @@ void log_general(const int fd, const char *log_name, const char *format, ...)
 }
 
 /**
- * Create a log file with the specified path
+ * @brief Create a log file with the specified path
  * If the file already exists, it will be overwritten.
  * The file descriptor is returned.
  * If the file cannot be created, -1 is returned.
@@ -91,21 +94,22 @@ void log_general(const int fd, const char *log_name, const char *format, ...)
  */
 int create_log_file(const char *path)
 {
-    FILE *log_file = fopen(path, "w");
-    if (log_file == NULL)
+    int fd = open(path, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+    if (fd == -1)
         return -1;
 
-    return log_file->_fileno;
+    return fd;
 }
 
 /**
- * Initialize the log file.
+ * @brief Initialize the log file.
  * Handles the presence of the MSM_OUTPUT environment variable
  * and creates the log file accordingly.
  *
  */
 void init_logging()
 {
+    // Get the path from the environment variable
     const char *path = getenv("MSM_OUTPUT");
     if (path == NULL)
     {
@@ -113,16 +117,28 @@ void init_logging()
         return;
     }
 
+    // If stdout, set the file descriptor to stdout
+    if (strcmp(path, "stdout") == 0)
+    {
+        log_fd = STDOUT_FILENO;
+        return;
+    }
+
+    // If already opened, return
+    if (log_fd != -1)
+        return;
+
     log_fd = create_log_file(path);
     if (log_fd == -1)
     {
-        log_general(STDERR_FILENO, LOG_ERROR, "Failed to create log file");
+        log_fd = STDERR_FILENO;
+        LOG_ERROR("Failed to create log file");
         return;
     }
 }
 
 /**
- * Close the log file.
+ * @brief Close the log file.
  *
  */
 void close_logging()
@@ -130,5 +146,35 @@ void close_logging()
     if (log_fd == DEACTIVATE_LOGGING)
         return;
 
+    LOG_INFO("Closing log file");
+
     close(log_fd);
+}
+
+/**
+ * @brief Get a random 4 bytes canary value
+ *
+ * @return random canary value
+ */
+canary_t get_random_canary()
+{
+    // Open /dev/urandom
+    uint32_t fd = open("/dev/urandom", O_RDONLY);
+    if (fd == (uint32_t)-1)
+        return 0;
+
+    // Read 4 bytes from /dev/urandom
+    uint32_t random = 0;
+    if (lseek(fd, -4, SEEK_END) == -1)
+        return 0;
+
+    // Put the random value in the canary
+    if (read(fd, &random, sizeof(random)) == -1)
+        return 0;
+
+    random &= 0x00FFFFFF; // Create a null byte at the beginning
+
+    close(fd);
+
+    return random;
 }
