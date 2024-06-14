@@ -251,6 +251,13 @@ chunk_list_t *get_chunk(void *ptr)
     return NULL;
 }
 
+/**
+ * @brief Set a random canary value to a chunk.
+ * The canary value is used to detect heap overflows, it is placed at the end of the data block.
+ * Is it a random value to make it harder to predict.
+ *
+ * @return 0 if the canary was set, -1 otherwise.
+ */
 int set_chunk_canary(chunk_list_t *chunk)
 {
     if (chunk == NULL)
@@ -285,6 +292,26 @@ int set_chunk_canary(chunk_list_t *chunk)
 }
 
 /**
+ * @brief Check the integrity of the canary value of a chunk.
+ * The canary value is used to detect heap overflows, it is placed at the end of the data block.
+ *
+ * @param chunk The chunk to check the canary value.
+ */
+void check_canary_integrity(chunk_list_t *chunk)
+{
+    canary_t canary = 0;
+    memcpy(
+        &canary,
+        (uint8_t *)(chunk->data) + chunk->size,
+        sizeof(canary_t));
+
+    if (canary != chunk->canary)
+        LOG_ERROR("check_canary_integrity - canary corrupted");
+
+    return;
+}
+
+/**
  * @brief Frees a previously allocated memory block.
  *
  * This function marks the memory block pointed to by `ptr` as free. If the block is already free,
@@ -315,13 +342,14 @@ void my_free(void *ptr)
         return;
     }
 
+    // Check canary integrity
+    check_canary_integrity(chunk);
+
     // Free the chunk
     if (chunk->state == USED)
         chunk->state = FREE;
 
     merge_consecutive_chunks();
-
-    // TODO: check canary integrity
 }
 
 /**
@@ -464,24 +492,21 @@ void check_memory_leaks()
 void clean()
 {
     // Get total size of the data pool
-    size_t data_size = 0;
     chunk_list_t *current = cl_metadata_head;
     while (current != NULL)
     {
-        data_size += current->size;
+        munmap(cl_metadata_head, current->size + sizeof(canary_t));
         current = current->next;
     }
-
-    // Free the data pool
-    munmap(cl_metadata_head, data_size);
 
     // Free the metadata pool
     munmap(cl_metadata_head, metadata_offset * sizeof(chunk_list_t));
 
     // Reset the global variables
     cl_metadata_head = NULL;
-
     metadata_size = 0;
+
+    LOG_INFO("clean - Memory pool cleaned");
 }
 
 #ifdef DYNAMIC
