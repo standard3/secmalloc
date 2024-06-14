@@ -130,8 +130,7 @@ Test(allocation, calloc)
 // Stress tests
 Test(allocation, random_allocations)
 {
-    // srand(time(NULL));
-    srand(123);
+    srand(time(NULL));
 
     int num_allocs = rand() % 100 + 1;
     void **ptrs = my_malloc(num_allocs * sizeof(void *));
@@ -152,7 +151,7 @@ Test(allocation, random_allocations)
     for (int i = 0; i < num_allocs; i++)
         my_free(ptrs[i]);
 
-    free(ptrs);
+    my_free(ptrs);
 }
 
 Test(allocation, random_allocations_with_frees)
