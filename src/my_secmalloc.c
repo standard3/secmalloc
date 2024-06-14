@@ -192,6 +192,10 @@ void *split_chunk(chunk_list_t *chunk, size_t size)
  */
 void *get_free_chunk(size_t size)
 {
+    size = (size % 16 ? size + 16 - (size % 16) : size); // Align the size to 16 bytes
+
+    LOG_INFO("get_free_chunk - Allocating chunk of size %zu", size);
+
     void *data = NULL;
     chunk_list_t *free_chunk = find_free_chunk(size);
 
