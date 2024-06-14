@@ -12,7 +12,7 @@ extern int log_fd; // Defined in utils.c, used for logging
 
 chunk_list_t *cl_metadata_head = NULL;
 
-const size_t metadata_offset = 1e5; // 100 000 pages
+const size_t metadata_offset = 1e4; // 100 000 pages
 unsigned int metadata_size = 0;
 
 /**
@@ -93,7 +93,7 @@ chunk_list_t *init_heap()
     chunk_list_t *cl_metadata = (chunk_list_t *)ptr;
     metadata_size++;
     cl_metadata->data = ptr_data;
-    cl_metadata->size = PAGE_SIZE;
+    cl_metadata->size = PAGE_SIZE - sizeof(canary_t);
     cl_metadata->state = FREE;
     cl_metadata->next = NULL;
     set_chunk_canary(cl_metadata);
@@ -114,7 +114,7 @@ chunk_list_t *find_free_chunk(size_t size)
     chunk_list_t *current = cl_metadata_head;
     while (current != NULL)
     {
-        if (current->state == FREE && current->size >= size)
+        if (current->state == FREE && current->size >= size + sizeof(canary_t))
         {
             LOG_INFO("find_free_chunk - Found free chunk of size %zu at address %p", size, current->data);
             return current;
@@ -134,6 +134,8 @@ chunk_list_t *find_free_chunk(size_t size)
  */
 void *allocate_chunk(size_t size)
 {
+    LOG_INFO("allocate_chunk - Allocating chunk of size %zu", size);
+
     // Create a new metadata entry at the end of the list
     chunk_list_t *new_metadata = (chunk_list_t *)(cl_metadata_head + (sizeof(chunk_list_t) * metadata_size++));
 
@@ -142,17 +144,28 @@ void *allocate_chunk(size_t size)
     new_metadata->data = (uint8_t *)(data);
     new_metadata->size = size;
     new_metadata->state = USED;
+    new_metadata->next = NULL;
     set_chunk_canary(new_metadata);
 
     // Split the remaining free space into a new chunk
-    chunk_list_t *empty_next = (chunk_list_t *)(cl_metadata_head + (sizeof(chunk_list_t) * metadata_size++));
-    empty_next->data = (uint8_t *)(data) + size + sizeof(canary_t); // + sizeof(canary_t) to avoid canary overwrite
-    empty_next->size = PAGE_SIZE - (size % PAGE_SIZE + sizeof(canary_t));
-    empty_next->state = FREE;
-    empty_next->next = NULL;
-    set_chunk_canary(empty_next);
+    // if the size of the allocated block is not a multiple of the page size
+    if (size + sizeof(canary_t) % PAGE_SIZE != 0)
+    {
+        chunk_list_t *empty_next = (chunk_list_t *)(cl_metadata_head + (sizeof(chunk_list_t) * metadata_size++));
+        empty_next->data = (uint8_t *)(data) + size + sizeof(canary_t); // + sizeof(canary_t) to avoid canary overwrite
+        empty_next->size = PAGE_SIZE - (((size + sizeof(canary_t)) % PAGE_SIZE) + sizeof(canary_t));
+        empty_next->state = FREE;
+        empty_next->next = NULL;
+        set_chunk_canary(empty_next);
 
-    new_metadata->next = empty_next;
+        new_metadata->next = empty_next;
+    }
+
+    // Append the new metadata entry to the end of the list
+    chunk_list_t *current = cl_metadata_head;
+    while (current->next != NULL)
+        current = current->next;
+    current->next = new_metadata;
 
     return new_metadata->data;
 }
@@ -167,16 +180,24 @@ void *allocate_chunk(size_t size)
  */
 void *split_chunk(chunk_list_t *chunk, size_t size)
 {
+    // If the size is too large, we can't split the chunk, so we use it directly
+    if (chunk->size + (sizeof(canary_t) * 2) <= size)
+    {
+        LOG_INFO("split_chunk - chunk size is smaller than the requested size");
+        chunk->state = USED;
+        return chunk->data;
+    }
+
     // If the size of the free chunk is exactly the same as the requested size, we can use it directly
     chunk_list_t *empty = (chunk_list_t *)(cl_metadata_head + (sizeof(chunk_list_t) * metadata_size++));
     empty->data = (uint8_t *)(chunk->data) + size + sizeof(canary_t); // + sizeof(canary_t) to avoid precedent canary overwrite
-    empty->size = chunk->size - size;
+    empty->size = chunk->size - (size + sizeof(canary_t));
     empty->state = FREE;
     empty->next = chunk->next;
     set_chunk_canary(empty);
 
     // Update the metadata of the free chunk
-    chunk->size = size - sizeof(canary_t);
+    chunk->size = size;
     chunk->state = USED;
     chunk->next = empty;
     set_chunk_canary(chunk);
@@ -222,15 +243,23 @@ void merge_consecutive_chunks()
     while (current != NULL)
     {
         // Current chunk is free, not null and its next chunk is free
-        while (current->state == FREE && current->next != NULL && current->next->state == FREE)
-        {
-            // Ensure the next chunk is on the same page
-            if ((uint8_t *)current->data + current->size + sizeof(canary_t) != current->next->data)
-                break;
+        // Ensure the next chunk is on the same page
+        chunk_list_t *tmp = current;
+        size_t size = tmp->size;
 
-            current->size += current->next->size + sizeof(canary_t);
-            current->next = current->next->next;
+        // Merge consecutive free chunks
+        while (tmp->state == FREE && tmp->next != NULL && tmp->next->state == FREE && (uint8_t *)tmp->data + tmp->size + sizeof(canary_t) == tmp->next->data)
+        {
+            size += tmp->next->size + sizeof(canary_t);
+            tmp->canary = tmp->next->canary;
+            tmp = tmp->next;
         }
+
+        // Update the current chunk
+        current->next = tmp->next;
+        current->size = size;
+        current->canary = tmp->canary;
+
         current = current->next;
     }
 }
@@ -276,21 +305,10 @@ int set_chunk_canary(chunk_list_t *chunk)
 
     chunk->canary = canary;
 
-    LOG_INFO("Chunk {\n data=%p,\n size=%zu,\n state=%d,\n canary=%04x,\n &canary=%p,\n &(data+size)=%p,\n next=%p\n}",
-             chunk->data,
-             chunk->size,
-             chunk->state,
-             chunk->canary,
-             &chunk->canary,
-             (uint8_t *)(chunk->data) + chunk->size,
-             chunk->next);
-
     memcpy(
         (uint8_t *)(chunk->data) + chunk->size,
         &chunk->canary,
         sizeof(canary_t));
-
-    LOG_INFO("canary - NOT CRASHED");
 
     return 0;
 }
@@ -499,7 +517,7 @@ void clean()
     chunk_list_t *current = cl_metadata_head;
     while (current != NULL)
     {
-        munmap(cl_metadata_head, current->size + sizeof(canary_t));
+        munmap(current->data, current->size + sizeof(canary_t));
         current = current->next;
     }
 
