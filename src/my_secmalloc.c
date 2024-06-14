@@ -12,7 +12,7 @@ extern int log_fd; // Defined in utils.c, used for logging
 
 chunk_list_t *cl_metadata_head = NULL;
 
-const size_t metadata_offset = 1e4; // 100 000 pages
+const size_t metadata_offset = 1e4; // 10 000 pages
 unsigned int metadata_size = 0;
 
 /**
