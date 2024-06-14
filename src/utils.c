@@ -172,6 +172,8 @@ canary_t get_random_canary()
     if (read(fd, &random, sizeof(random)) == -1)
         return 0;
 
+    random &= 0x00FFFFFF; // Create a null byte at the beginning
+
     close(fd);
 
     return random;
