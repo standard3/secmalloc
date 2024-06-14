@@ -15,6 +15,9 @@
 #define LOG_WARN(format, ...) LOG_GENERAL(LOG_TYPE_WARN, format, __VA_ARGS__)
 #define LOG_ERROR(format, ...) LOG_GENERAL(LOG_TYPE_ERROR, format, __VA_ARGS__)
 
+/** @brief Represents a canary value. */
+typedef uint32_t canary_t;
+
 struct tm *get_current_time(void);
 
 void log_general(const int fd, const char *log_name, const char *format, ...);
@@ -22,6 +25,6 @@ int create_log_file(const char *filename);
 void init_logging(void);
 void close_logging(void);
 
-uint32_t get_random_canary(void);
+canary_t get_random_canary(void);
 
 #endif

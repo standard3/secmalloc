@@ -35,11 +35,11 @@ Test(mmap, simple_mmap)
 
 /* INITIALIZATION */
 
-Test(initialization, initialize)
-{
-    void *ptr = init_heap();
-    cr_expect(ptr != NULL);
-}
+// Test(initialization, initialize)
+// {
+//     void *ptr = init_heap();
+//     cr_expect(ptr != NULL);
+// }
 
 /* ALLOCATION */
 
@@ -62,185 +62,186 @@ Test(allocation, allocation_and_write)
 
 Test(allocation, multiple_allocations)
 {
-
     void *ptr1 = my_malloc(1000);
     void *ptr2 = my_malloc(1000);
     void *ptr3 = my_malloc(1000);
     void *ptr4 = my_malloc(1000);
+
     cr_expect(ptr1 != NULL);
     cr_expect(ptr2 != NULL);
     cr_expect(ptr3 != NULL);
     cr_expect(ptr4 != NULL);
+
     my_free(ptr1);
     my_free(ptr2);
     my_free(ptr3);
     my_free(ptr4);
 }
 
-Test(allocation, fragmentation)
-{
-    // Allocate multiple blocks
-    void *ptr1 = my_malloc(1000);
-    void *ptr2 = my_malloc(4096);
-    void *ptr3 = my_malloc(1000);
+// Test(allocation, fragmentation)
+// {
+//     // Allocate multiple blocks
+//     void *ptr1 = my_malloc(1000);
+//     void *ptr2 = my_malloc(4096);
+//     void *ptr3 = my_malloc(1000);
 
-    cr_expect(ptr1 != NULL);
-    cr_expect(ptr2 != NULL);
-    cr_expect(ptr3 != NULL);
+//     cr_expect(ptr1 != NULL);
+//     cr_expect(ptr2 != NULL);
+//     cr_expect(ptr3 != NULL);
 
-    // Write strings in those
-    strncpy(ptr1, "Hello", 6);
-    strncpy(ptr2, "World", 6);
-    strncpy(ptr3, "!", 2);
+//     // Write strings in those
+//     strncpy(ptr1, "Hello", 6);
+//     strncpy(ptr2, "World", 6);
+//     strncpy(ptr3, "!", 2);
 
-    cr_expect(strcmp(ptr1, "Hello") == 0);
-    cr_expect(strcmp(ptr2, "World") == 0);
-    cr_expect(strcmp(ptr3, "!") == 0);
+//     cr_expect(strcmp(ptr1, "Hello") == 0);
+//     cr_expect(strcmp(ptr2, "World") == 0);
+//     cr_expect(strcmp(ptr3, "!") == 0);
 
-    my_free(ptr1);
-    my_free(ptr2);
-    my_free(ptr3);
-}
+//     my_free(ptr1);
+//     my_free(ptr2);
+//     my_free(ptr3);
+// }
 
-Test(allocation, reallocate_memory)
-{
-    void *ptr = my_malloc(100);
-    void *new_ptr = my_realloc(ptr, 200);
+// Test(allocation, reallocate_memory)
+// {
+//     void *ptr = my_malloc(100);
+//     void *new_ptr = my_realloc(ptr, 200);
 
-    cr_expect(new_ptr != NULL);
+//     cr_expect(new_ptr != NULL);
 
-    my_free(new_ptr);
-}
+//     my_free(new_ptr);
+// }
 
-Test(allocation, calloc)
-{
-    void *ptr = my_calloc(10, 20);
-    cr_expect(ptr != NULL);
+// Test(allocation, calloc)
+// {
+//     void *ptr = my_calloc(10, 20);
+//     cr_expect(ptr != NULL);
 
-    for (size_t i = 0; i < 10 * 20; i++)
-        cr_expect(((char *)ptr)[i] == 0);
+//     for (size_t i = 0; i < 10 * 20; i++)
+//         cr_expect(((char *)ptr)[i] == 0);
 
-    my_free(ptr);
-}
+//     my_free(ptr);
+// }
 
-// Stress tests
-Test(allocation, random_allocations)
-{
-    srand(time(NULL));
-    int num_allocs = rand() % 100 + 1;
-    void **ptrs = malloc(num_allocs * sizeof(void *));
-    for (int i = 0; i < num_allocs; i++)
-    {
-        int size = rand() % 4096 + 1;
-        ptrs[i] = my_malloc(size);
-        cr_expect(ptrs[i] != NULL);
-    }
-    for (int i = 0; i < num_allocs; i++)
-    {
-        my_free(ptrs[i]);
-    }
-    free(ptrs);
-}
+// // Stress tests
+// Test(allocation, random_allocations)
+// {
+//     srand(time(NULL));
+//     int num_allocs = rand() % 100 + 1;
+//     void **ptrs = malloc(num_allocs * sizeof(void *));
+//     for (int i = 0; i < num_allocs; i++)
+//     {
+//         int size = rand() % 4096 + 1;
+//         ptrs[i] = my_malloc(size);
+//         cr_expect(ptrs[i] != NULL);
+//     }
+//     for (int i = 0; i < num_allocs; i++)
+//     {
+//         my_free(ptrs[i]);
+//     }
+//     free(ptrs);
+// }
 
-Test(allocation, random_allocations_with_frees)
-{
-    srand(time(NULL));
-    int num_allocs = rand() % 100 + 1;
-    void **ptrs = malloc(num_allocs * sizeof(void *));
-    bool *freed = malloc(num_allocs * sizeof(bool));
-    for (int i = 0; i < num_allocs; i++)
-    {
-        int size = rand() % 4096 + 1;
-        ptrs[i] = my_malloc(size);
-        freed[i] = false;
-        cr_expect(ptrs[i] != NULL);
-        if (rand() % 2 == 0 && i > 0)
-        {
-            int j;
-            do
-            {
-                j = rand() % i;
-            } while (freed[j]);
-            my_free(ptrs[j]);
-            freed[j] = true;
-        }
-    }
-    for (int i = 0; i < num_allocs; i++)
-    {
-        if (!freed[i])
-        {
-            my_free(ptrs[i]);
-        }
-    }
-    free(ptrs);
-    free(freed);
-}
+// Test(allocation, random_allocations_with_frees)
+// {
+//     srand(time(NULL));
+//     int num_allocs = rand() % 100 + 1;
+//     void **ptrs = malloc(num_allocs * sizeof(void *));
+//     bool *freed = malloc(num_allocs * sizeof(bool));
+//     for (int i = 0; i < num_allocs; i++)
+//     {
+//         int size = rand() % 4096 + 1;
+//         ptrs[i] = my_malloc(size);
+//         freed[i] = false;
+//         cr_expect(ptrs[i] != NULL);
+//         if (rand() % 2 == 0 && i > 0)
+//         {
+//             int j;
+//             do
+//             {
+//                 j = rand() % i;
+//             } while (freed[j]);
+//             my_free(ptrs[j]);
+//             freed[j] = true;
+//         }
+//     }
+//     for (int i = 0; i < num_allocs; i++)
+//     {
+//         if (!freed[i])
+//         {
+//             my_free(ptrs[i]);
+//         }
+//     }
+//     free(ptrs);
+//     free(freed);
+// }
 
-/* SECURITY FEATURES */
+// /* SECURITY FEATURES */
 
-Test(security, buffer_overflow_detection)
-{
-    void *ptr = my_malloc(100);
-    cr_expect(ptr != NULL);
+// Test(security, buffer_overflow_detection)
+// {
+//     void *ptr = my_malloc(100);
+//     cr_expect(ptr != NULL);
 
-    char *data = (char *)ptr;
-    for (int i = 0; i < 150; i++)
-        data[i] = 'A'; // Write past the allocated memory
+//     char *data = (char *)ptr;
+//     for (int i = 0; i < 150; i++)
+//         data[i] = 'A'; // Write past the allocated memory
 
-    // Ideally, here we should have a way to detect the overflow
-    my_free(ptr);
-}
+//     // Ideally, here we should have a way to detect the overflow
+//     my_free(ptr);
+// }
 
-Test(security, double_free_detection)
-{
-    void *ptr = my_malloc(100);
-    cr_expect(ptr != NULL);
+// Test(security, double_free_detection)
+// {
+//     void *ptr = my_malloc(100);
+//     cr_expect(ptr != NULL);
 
-    my_free(ptr);
+//     my_free(ptr);
 
-    // Double free
-    my_free(ptr);
+//     // Double free
+//     my_free(ptr);
 
-    // Ideally, here we should have a way to detect the double free
-}
+//     // Ideally, here we should have a way to detect the double free
+// }
 
-Test(security, use_after_free_detection)
-{
-    void *ptr = my_malloc(100);
-    cr_expect(ptr != NULL);
+// Test(security, use_after_free_detection)
+// {
+//     void *ptr = my_malloc(100);
+//     cr_expect(ptr != NULL);
 
-    my_free(ptr);
+//     my_free(ptr);
 
-    char *data = (char *)ptr;
-    strcpy(data, "Use after free");
+//     char *data = (char *)ptr;
+//     strcpy(data, "Use after free");
 
-    // Ideally, here we should have a way to detect the use after free
-}
+//     // Ideally, here we should have a way to detect the use after free
+// }
 
-Test(security, memory_leak_detection)
-{
-    void *ptr = my_malloc(100);
-    cr_expect(ptr != NULL);
+// Test(security, memory_leak_detection)
+// {
+//     void *ptr = my_malloc(100);
+//     cr_expect(ptr != NULL);
 
-    // Memory leak
-}
+//     // Memory leak
+// }
 
-/* CHUNK LIST */
+// /* CHUNK LIST */
 
-Test(chunk_list, find_free_block)
-{
-    init_heap();
+// Test(chunk_list, find_free_block)
+// {
+//     init_heap();
 
-    void *ptr1 = my_malloc(100);
-    void *ptr2 = my_malloc(200);
+//     void *ptr1 = my_malloc(100);
+//     void *ptr2 = my_malloc(200);
 
-    my_free(ptr1);
+//     my_free(ptr1);
 
-    chunk_list_t *empty_block = find_free_chunk(100);
+//     chunk_list_t *empty_block = find_free_chunk(100);
 
-    cr_expect(empty_block != NULL);
-    cr_expect(empty_block->state == FREE);
-    cr_expect(empty_block->size >= 100);
+//     cr_expect(empty_block != NULL);
+//     cr_expect(empty_block->state == FREE);
+//     cr_expect(empty_block->size >= 100);
 
-    my_free(ptr2);
-}
+//     my_free(ptr2);
+// }

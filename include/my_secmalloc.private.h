@@ -1,7 +1,10 @@
 #ifndef _SECMALLOC_PRIVATE_H
 #define _SECMALLOC_PRIVATE_H
 
+#include <stdint.h>
+
 #include "my_secmalloc.h"
+#include "utils.h"
 
 /** @brief Represents the state of a memory chunk. */
 typedef enum
@@ -23,7 +26,7 @@ typedef struct chunk_list_t
     size_t size;               // Size of the chunk
     void *data;                // Address of chunk data
     chunk_state_t state;       // State of the chunk
-    // unsigned int canary;       // Canary protection
+    canary_t canary;           // Canary protection
 } chunk_list_t;
 
 // Heap initialization
@@ -40,6 +43,7 @@ void clean(void);
 
 // Security features
 void check_memory_leaks(void);
+int set_chunk_canary(chunk_list_t *chunk);
 
 // Secure memory allocation
 void my_free(void *ptr);
