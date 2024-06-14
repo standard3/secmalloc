@@ -1,5 +1,5 @@
 CC = gcc
-CFLAGS = -I./include -Wall -Wextra -Werror -Wformat=2 -Wundef -Wshadow -Wpointer-arith -Wcast-align -Wstrict-prototypes -Wstrict-overflow=4
+CFLAGS = -I./include -g -Wall -Wextra -Werror -Wformat=2 -Wundef -Wshadow -Wpointer-arith -Wcast-align -Wstrict-prototypes -Wstrict-overflow=4
 PRJ = my_secmalloc
 OBJS = src/my_secmalloc.o src/utils.o
 SLIB = lib${PRJ}.a

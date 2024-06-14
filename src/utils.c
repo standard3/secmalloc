@@ -156,7 +156,7 @@ void close_logging()
  *
  * @return random canary value
  */
-uint32_t get_random_canary()
+canary_t get_random_canary()
 {
     // Open /dev/urandom
     uint32_t fd = open("/dev/urandom", O_RDONLY);
@@ -171,6 +171,8 @@ uint32_t get_random_canary()
     // Put the random value in the canary
     if (read(fd, &random, sizeof(random)) == -1)
         return 0;
+
+    random &= 0x00FFFFFF; // Create a null byte at the beginning
 
     close(fd);
 

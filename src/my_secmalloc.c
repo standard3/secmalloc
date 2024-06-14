@@ -5,16 +5,14 @@
 #include <stdlib.h>   // atexit
 
 #include "my_secmalloc.private.h"
-#include "utils.h"
 
 #define PAGE_SIZE 4096
 
 extern int log_fd; // Defined in utils.c, used for logging
 
 chunk_list_t *cl_metadata_head = NULL;
-chunk_list_t *cl_metadata_tail = NULL;
 
-const size_t metadata_offset = 1e5; // 100 000 pages
+const size_t metadata_offset = 1e4; // 10 000 pages
 unsigned int metadata_size = 0;
 
 /**
@@ -92,15 +90,15 @@ chunk_list_t *init_heap()
     }
 
     // Set our global variables to our newly created pool
-    chunk_list_t *ptr_meta = (chunk_list_t *)ptr;
+    chunk_list_t *cl_metadata = (chunk_list_t *)ptr;
     metadata_size++;
-    ptr_meta->data = ptr_data;
-    ptr_meta->size = PAGE_SIZE;
-    ptr_meta->state = FREE;
-    ptr_meta->next = NULL;
+    cl_metadata->data = ptr_data;
+    cl_metadata->size = PAGE_SIZE - sizeof(canary_t);
+    cl_metadata->state = FREE;
+    cl_metadata->next = NULL;
+    set_chunk_canary(cl_metadata);
 
-    cl_metadata_head = ptr_meta;
-    cl_metadata_tail = ptr_meta;
+    cl_metadata_head = cl_metadata;
 
     return ptr;
 }
@@ -116,7 +114,7 @@ chunk_list_t *find_free_chunk(size_t size)
     chunk_list_t *current = cl_metadata_head;
     while (current != NULL)
     {
-        if (current->state == FREE && current->size >= size)
+        if (current->state == FREE && current->size >= size + sizeof(canary_t))
         {
             LOG_INFO("find_free_chunk - Found free chunk of size %zu at address %p", size, current->data);
             return current;
@@ -136,23 +134,38 @@ chunk_list_t *find_free_chunk(size_t size)
  */
 void *allocate_chunk(size_t size)
 {
-    chunk_list_t *new_metadata = (chunk_list_t *)(cl_metadata_head + (sizeof(chunk_list_t) * metadata_size++));
-    cl_metadata_tail->next = new_metadata;
+    LOG_INFO("allocate_chunk - Allocating chunk of size %zu", size);
 
-    void *data = init_pool(cl_metadata_head + (sizeof(chunk_list_t) * metadata_offset), size);
-    new_metadata->data = data;
+    // Create a new metadata entry at the end of the list
+    chunk_list_t *new_metadata = (chunk_list_t *)(cl_metadata_head + (sizeof(chunk_list_t) * metadata_size++));
+
+    // Allocate a new chunk of memory
+    void *data = init_pool(cl_metadata_head + (sizeof(chunk_list_t) * metadata_offset), size + sizeof(canary_t));
+    new_metadata->data = (uint8_t *)(data);
     new_metadata->size = size;
     new_metadata->state = USED;
+    new_metadata->next = NULL;
+    set_chunk_canary(new_metadata);
 
-    chunk_list_t *empty_next = (chunk_list_t *)(cl_metadata_head + (sizeof(chunk_list_t) * metadata_size++));
-    empty_next->data = (chunk_list_t *)data + size;
-    empty_next->size = PAGE_SIZE - (size % PAGE_SIZE);
-    empty_next->state = FREE;
-    empty_next->next = NULL;
+    // Split the remaining free space into a new chunk
+    // if the size of the allocated block is not a multiple of the page size
+    if (size + sizeof(canary_t) % PAGE_SIZE != 0)
+    {
+        chunk_list_t *empty_next = (chunk_list_t *)(cl_metadata_head + (sizeof(chunk_list_t) * metadata_size++));
+        empty_next->data = (uint8_t *)(data) + size + sizeof(canary_t); // + sizeof(canary_t) to avoid canary overwrite
+        empty_next->size = PAGE_SIZE - (((size + sizeof(canary_t)) % PAGE_SIZE) + sizeof(canary_t));
+        empty_next->state = FREE;
+        empty_next->next = NULL;
+        set_chunk_canary(empty_next);
 
-    new_metadata->next = empty_next;
+        new_metadata->next = empty_next;
+    }
 
-    cl_metadata_tail = empty_next;
+    // Append the new metadata entry to the end of the list
+    chunk_list_t *current = cl_metadata_head;
+    while (current->next != NULL)
+        current = current->next;
+    current->next = new_metadata;
 
     return new_metadata->data;
 }
@@ -167,21 +180,27 @@ void *allocate_chunk(size_t size)
  */
 void *split_chunk(chunk_list_t *chunk, size_t size)
 {
+    // If the size is too large, we can't split the chunk, so we use it directly
+    if (chunk->size + (sizeof(canary_t) * 2) <= size)
+    {
+        LOG_INFO("split_chunk - chunk size is smaller than the requested size");
+        chunk->state = USED;
+        return chunk->data;
+    }
+
     // If the size of the free chunk is exactly the same as the requested size, we can use it directly
     chunk_list_t *empty = (chunk_list_t *)(cl_metadata_head + (sizeof(chunk_list_t) * metadata_size++));
-    empty->data = (chunk_list_t *)chunk->data + size;
-    empty->size = chunk->size - size;
+    empty->data = (uint8_t *)(chunk->data) + size + sizeof(canary_t); // + sizeof(canary_t) to avoid precedent canary overwrite
+    empty->size = chunk->size - (size + sizeof(canary_t));
     empty->state = FREE;
     empty->next = chunk->next;
+    set_chunk_canary(empty);
 
     // Update the metadata of the free chunk
     chunk->size = size;
     chunk->state = USED;
     chunk->next = empty;
-
-    // If the chunk is the tail, update the tail
-    if (chunk == cl_metadata_tail)
-        cl_metadata_tail = empty;
+    set_chunk_canary(chunk);
 
     return chunk->data;
 }
@@ -194,6 +213,10 @@ void *split_chunk(chunk_list_t *chunk, size_t size)
  */
 void *get_free_chunk(size_t size)
 {
+    size = (size % 16 ? size + 16 - (size % 16) : size); // Align the size to 16 bytes
+
+    LOG_INFO("get_free_chunk - Allocating chunk of size %zu", size);
+
     void *data = NULL;
     chunk_list_t *free_chunk = find_free_chunk(size);
 
@@ -220,11 +243,23 @@ void merge_consecutive_chunks()
     while (current != NULL)
     {
         // Current chunk is free, not null and its next chunk is free
-        while (current->state == FREE && current->next != NULL && current->next->state == FREE)
+        // Ensure the next chunk is on the same page
+        chunk_list_t *tmp = current;
+        size_t size = tmp->size;
+
+        // Merge consecutive free chunks
+        while (tmp->state == FREE && tmp->next != NULL && tmp->next->state == FREE && (uint8_t *)tmp->data + tmp->size + sizeof(canary_t) == tmp->next->data)
         {
-            current->size += current->next->size;
-            current->next = current->next->next;
+            size += tmp->next->size + sizeof(canary_t);
+            tmp->canary = tmp->next->canary;
+            tmp = tmp->next;
         }
+
+        // Update the current chunk
+        current->next = tmp->next;
+        current->size = size;
+        current->canary = tmp->canary;
+
         current = current->next;
     }
 }
@@ -247,6 +282,55 @@ chunk_list_t *get_chunk(void *ptr)
     }
 
     return NULL;
+}
+
+/**
+ * @brief Set a random canary value to a chunk.
+ * The canary value is used to detect heap overflows, it is placed at the end of the data block.
+ * Is it a random value to make it harder to predict.
+ *
+ * @return 0 if the canary was set, -1 otherwise.
+ */
+int set_chunk_canary(chunk_list_t *chunk)
+{
+    if (chunk == NULL)
+        return -1;
+
+    canary_t canary = get_random_canary();
+    if (canary == 0)
+    {
+        LOG_ERROR("set_chunk_canary - can't get a canary");
+        return -1;
+    }
+
+    chunk->canary = canary;
+
+    memcpy(
+        (uint8_t *)(chunk->data) + chunk->size,
+        &chunk->canary,
+        sizeof(canary_t));
+
+    return 0;
+}
+
+/**
+ * @brief Check the integrity of the canary value of a chunk.
+ * The canary value is used to detect heap overflows, it is placed at the end of the data block.
+ *
+ * @param chunk The chunk to check the canary value.
+ */
+void check_canary_integrity(chunk_list_t *chunk)
+{
+    canary_t canary = 0;
+    memcpy(
+        &canary,
+        (uint8_t *)(chunk->data) + chunk->size,
+        sizeof(canary_t));
+
+    if (canary != chunk->canary)
+        LOG_ERROR("check_canary_integrity - canary corrupted");
+
+    return;
 }
 
 /**
@@ -280,13 +364,14 @@ void my_free(void *ptr)
         return;
     }
 
+    // Check canary integrity
+    check_canary_integrity(chunk);
+
     // Free the chunk
     if (chunk->state == USED)
         chunk->state = FREE;
 
     merge_consecutive_chunks();
-
-    // TODO: check canary integrity
 }
 
 /**
@@ -314,7 +399,7 @@ void *my_malloc(size_t size)
         return NULL; // FIXME: should return a freeable chunk
 
     // Allocate data block
-    void *ptr_data = allocate_chunk(size);
+    void *ptr_data = get_free_chunk(size);
     if (ptr_data == NULL)
     {
         LOG_ERROR("my_malloc - can't allocate chunk of size %zu", size);
@@ -429,24 +514,21 @@ void check_memory_leaks()
 void clean()
 {
     // Get total size of the data pool
-    size_t data_size = 0;
     chunk_list_t *current = cl_metadata_head;
     while (current != NULL)
     {
-        data_size += current->size;
+        munmap(current->data, current->size + sizeof(canary_t));
         current = current->next;
     }
-
-    // Free the data pool
-    munmap(cl_metadata_head, data_size);
 
     // Free the metadata pool
     munmap(cl_metadata_head, metadata_offset * sizeof(chunk_list_t));
 
     // Reset the global variables
     cl_metadata_head = NULL;
-    cl_metadata_tail = NULL;
     metadata_size = 0;
+
+    LOG_INFO("clean - Memory pool cleaned");
 }
 
 #ifdef DYNAMIC

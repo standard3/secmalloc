@@ -8,6 +8,9 @@
 #include "my_secmalloc.h"
 #include "utils.h"
 
+extern int log_fd;
+extern chunk_list_t *cl_metadata_head;
+
 void setup(void)
 {
     init_logging();
@@ -62,15 +65,16 @@ Test(allocation, allocation_and_write)
 
 Test(allocation, multiple_allocations)
 {
-
     void *ptr1 = my_malloc(1000);
     void *ptr2 = my_malloc(1000);
     void *ptr3 = my_malloc(1000);
     void *ptr4 = my_malloc(1000);
+
     cr_expect(ptr1 != NULL);
     cr_expect(ptr2 != NULL);
     cr_expect(ptr3 != NULL);
     cr_expect(ptr4 != NULL);
+
     my_free(ptr1);
     my_free(ptr2);
     my_free(ptr3);
@@ -127,33 +131,45 @@ Test(allocation, calloc)
 Test(allocation, random_allocations)
 {
     srand(time(NULL));
+
     int num_allocs = rand() % 100 + 1;
-    void **ptrs = malloc(num_allocs * sizeof(void *));
+    void **ptrs = my_malloc(num_allocs * sizeof(void *));
+
+    // Allocate memory blocks of random sizes
     for (int i = 0; i < num_allocs; i++)
     {
         int size = rand() % 4096 + 1;
+
+        LOG_INFO("Allocating %d bytes", size);
         ptrs[i] = my_malloc(size);
+        LOG_INFO("NOT CRASHED");
+
         cr_expect(ptrs[i] != NULL);
     }
+
+    // Free all the allocated memory
     for (int i = 0; i < num_allocs; i++)
-    {
         my_free(ptrs[i]);
-    }
-    free(ptrs);
+
+    my_free(ptrs);
 }
 
 Test(allocation, random_allocations_with_frees)
 {
     srand(time(NULL));
+
     int num_allocs = rand() % 100 + 1;
     void **ptrs = malloc(num_allocs * sizeof(void *));
     bool *freed = malloc(num_allocs * sizeof(bool));
+
     for (int i = 0; i < num_allocs; i++)
     {
         int size = rand() % 4096 + 1;
         ptrs[i] = my_malloc(size);
         freed[i] = false;
+
         cr_expect(ptrs[i] != NULL);
+
         if (rand() % 2 == 0 && i > 0)
         {
             int j;
@@ -161,6 +177,7 @@ Test(allocation, random_allocations_with_frees)
             {
                 j = rand() % i;
             } while (freed[j]);
+
             my_free(ptrs[j]);
             freed[j] = true;
         }
@@ -168,9 +185,7 @@ Test(allocation, random_allocations_with_frees)
     for (int i = 0; i < num_allocs; i++)
     {
         if (!freed[i])
-        {
             my_free(ptrs[i]);
-        }
     }
     free(ptrs);
     free(freed);
