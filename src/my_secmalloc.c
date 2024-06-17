@@ -446,6 +446,24 @@ void *my_realloc(void *ptr, size_t size)
     if (chunk->size >= size)
         return ptr;
 
+    // Check if the next chunk is free and has enough space to fit the new size
+    if (chunk->next != NULL && chunk->next->state == FREE && chunk->size + chunk->next->size >= size)
+    {
+        // Ensure the next chunk is on the same page or the next one
+        if ((uint8_t *)chunk->data + chunk->size + sizeof(canary_t) == chunk->next->data)
+        {
+            // Merge the two chunks
+            chunk->size += chunk->next->size;
+            chunk->next = chunk->next->next;
+
+            // If the merged chunk is still smaller than the new size, split it
+            if (chunk->size < size)
+                split_chunk(chunk, size - chunk->size);
+
+            return ptr;
+        }
+    }
+
     // Allocate a new memory block with the new size
     void *new = my_malloc(size);
 
