@@ -116,6 +116,21 @@ Test(allocation, reallocate_memory)
     my_free(new_ptr);
 }
 
+Test(allocation, reallocate_memory_optimization)
+{
+    void *ptr = my_malloc(10);
+
+    cr_expect(ptr != NULL);
+
+    void *new_ptr = my_realloc(ptr, 20);
+    cr_expect(new_ptr != NULL);
+
+    // Assert the new pointer is the same as the old one
+    cr_expect(new_ptr == ptr);
+
+    my_free(new_ptr);
+}
+
 Test(allocation, calloc)
 {
     void *ptr = my_calloc(10, 20);
