@@ -84,6 +84,6 @@ And if possible, detect the end of a program's execution and catch memory leaks.
 
 ### Other ideas
 
-- [ ] Randomized canary
+- [x] Randomized canary
 - [ ] Dynamic detection of an overflow through a thread watching the heap
 - [ ] New algorithm handling page faults (see [userfaultfd](https://man7.org/linux/man-pages/man2/userfaultfd.2.html))
